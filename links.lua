@@ -15,7 +15,7 @@ local export = {}
 local m_str_utils = require('Module:string utilities')
 local pron_qualifier_module = "Module:pron qualifier"
 
-local anchor_encode = require('Module:fun').memoize(mw.uri.anchorEncode, true)
+local anchor_encode = require('fun').memoize(mw.uri.anchorEncode, true)
 local concat = table.concat
 local decode_entities = m_str_utils.decode_entities
 local decode_uri = m_str_utils.decode_uri

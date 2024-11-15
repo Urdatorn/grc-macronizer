@@ -1,6 +1,6 @@
 local data = {}
 
-local U = require("Module:string/char")
+local U = require("string.char")
 local macron = U(0x304)
 local spacing_macron = U(0xAF)
 local modifier_macron = U(0x2C9)

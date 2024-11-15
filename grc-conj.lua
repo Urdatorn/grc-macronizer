@@ -79,7 +79,7 @@ local perf_euph = {
 }
 
 local function get_label_display(dial)
-	return require('Module:labels').get_label_info { label = dial, lang = lang, nocat = true }.label
+	return require('labels').get_label_info { label = dial, lang = lang, nocat = true }.label
 end
 
 function export.show(frame)
@@ -120,17 +120,17 @@ function export.show(frame)
 	stem4 = args[5] or '' -- augmented passive
 	
 	if mw.ustring.find(stem1, '˘') then
-		require('Module:debug').track('grc-conj/manual-breve')
+		require('debug').track('grc-conj/manual-breve')
 	end
-	if args['dial1'] then require('Module:debug').track('grc-conj/dial1') end
-	if args['titleapp'] then require('Module:debug').track('grc-conj/titleapp') end
+	if args['dial1'] then require('debug').track('grc-conj/dial1') end
+	if args['titleapp'] then require('debug').track('grc-conj/titleapp') end
 	if args['prefix'] then
-		require('Module:debug').track('grc-conj/prefix')
+		require('debug').track('grc-conj/prefix')
 		args['prefix'] = mw.ustring.toNFD(args['prefix'])
 	end
 
 	if args.form then
-		local Array = require('Module:array')
+		local Array = require('array')
 		local valid_words = Array {
 			'con', 'open', 'act', 'mid', 'pass', 'am', 'ap', 'mp', 'full'
 		}
@@ -212,7 +212,7 @@ local function check_conjtype(conjtype)
 		local tense_code = conjtype:match '^%l+'
 		if tense_code then
 			if tense_names[tense_code] then
-				local valid_conjugations_for_tense = require('Module:array')
+				local valid_conjugations_for_tense = require('array')
 					.keys(conjugations)
 					:filter(
 						function (conjugation)
@@ -226,7 +226,7 @@ local function check_conjtype(conjtype)
 					.. valid_conjugations_for_tense .. '.')
 			else
 				error('No such tense: ' .. tense_code .. '; choose between '
-					.. require('Module:array').keys(tense_names)
+					.. require('array').keys(tense_names)
 						:map(
 							function (tense_code)
 								return tense_code .. ' (' .. tense_names[tense_code] .. ')'
@@ -1179,7 +1179,7 @@ conjugations['aor-omi'] = function()
 end
 
 conjugations['aor-amiw'] = function()
-	require('Module:debug').track('grc-conj/aor-amiw')
+	require('debug').track('grc-conj/aor-amiw')
 	ctable = data.aor_amiw
 	pctable = data.aor_pass
 	pstem = stem3
@@ -1215,7 +1215,7 @@ conjugations['aor-amiw'] = function()
 end
 
 conjugations['aor-ami'] = function()
-	require('Module:debug').track('grc-conj/aor-ami')
+	require('debug').track('grc-conj/aor-ami')
 	ctable = data.aor_ami
 	pctable = data.aor_pass
 	pstem = stem3
@@ -1234,7 +1234,7 @@ conjugations['aor-ami'] = function()
 end
 
 conjugations['aor-hmi'] = function()
-	require('Module:debug').track('grc-conj/aor-hmi')
+	require('debug').track('grc-conj/aor-hmi')
 	ctable = data.aor_hmi
 	pctable = data.aor_pass
 	pstem = stem3
@@ -1526,7 +1526,7 @@ function make_table()
 	end
 	
 	local dialtitle = args.dial and "(" .. get_label_display(args.dial) .. ")" or nil
-	return require('Module:TemplateStyles')('Module:grc-conj/style.css')
+	return require('TemplateStyles')('Module:grc-conj/style.css')
 .. [=[<div class="NavFrame">
 <div class="NavHead">&nbsp; &nbsp;]=] .. aliases[tense] .. ': '
 .. table.concat(get_title(), ', ') .. ' ' .. (args['titleapp'] or dialtitle or '') .. [=[</div>
@@ -1637,7 +1637,7 @@ function link_form(form_code, istitle)
 	
 	if args[form_code] then
 		form = args[form_code]
-		require('Module:debug').track('grc-conj/form-override')
+		require('debug').track('grc-conj/form-override')
 		if form == '' then return nil end
 	end
 

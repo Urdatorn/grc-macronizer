@@ -152,7 +152,7 @@ local function handle_unmarked_length(arg1, arg2, adjective)
 	local old_arg1, old_arg2 = arg1, arg2
 	if arg2 then
 		local m_accent = require('grc-accent')
-		local standard_diacritics = require('Module:grc-utilities').standardDiacritics
+		local standard_diacritics = require('grc-utilities').standardDiacritics
 		if arg1 == 'irreg' or arg1 == 'indecl' then
 			arg2 = m_accent.mark_implied_length(standard_diacritics(arg2))
 		else
@@ -212,14 +212,14 @@ local function get_args(args, is_adjective, function_name)
 		(irreg and form_param and form_param:find('N') and 'N_' or '') ..
 		(is_adjective and 'adj_' or 'noun_') ..
 		'params']
-	local args, unrecognized_args = require('Module:parameters').process(args, params, true, "grc-decl", function_name)
+	local args, unrecognized_args = require('parameters').process(args, params, true, "grc-decl", function_name)
 	
 	handle_unrecognized_args(unrecognized_args, is_adjective)
 	form_param, dialect_code = args.form, args.dial
 	args.maxindex = m_table.length(params)
 	
 	if irreg then
-		require('Module:debug').track('grc-decl/irreg')
+		require('debug').track('grc-decl/irreg')
 	end
 	
 	if is_adjective then

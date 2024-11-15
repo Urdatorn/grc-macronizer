@@ -16,7 +16,7 @@ local export = {}
 	Basic letters with and without diacritics, plus digamma and combining
 	diacritics.
 ]]
-local word_characters = require('Module:grc-utilities/data').word_characters
+local word_characters = require('grc-utilities.data').word_characters
 
 -- displayed in cell that has no form in it
 local empty_cell = '—'
@@ -50,7 +50,7 @@ end
 
 -- Creates a callable table that saves previous transliterations.
 -- Helpful because most paradigms have some syncretic forms; particularly useful for neuter forms.
-local transliterate = require('Module:fun').memoize(require('Module:grc-translit').tr)
+local transliterate = require('fun').memoize(require('Module:grc-translit').tr)
 
 local tag_translit = require('Module:script utilities').tag_translit
 local function format_translit(Greek_text)
@@ -58,11 +58,11 @@ local function format_translit(Greek_text)
 end
 
 local function get_label_display(dialect)
-	return require('Module:labels').get_label_info { label = dialect, lang = lang, nocat = true}.label
+	return require('labels').get_label_info { label = dialect, lang = lang, nocat = true}.label
 end
 
 local function get_stylesheet()
-	return require('Module:TemplateStyles')("Module:grc-decl/style.css")
+	return require('TemplateStyles')("Module:grc-decl/style.css")
 end
 
 local function make_number_table(number_arg)

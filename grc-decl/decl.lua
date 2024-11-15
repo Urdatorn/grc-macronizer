@@ -151,7 +151,7 @@ local function handle_noun_overrides(form_table, override_table)
 		for _, number in ipairs(number_codes) do
 			local key = case .. number
 			if override_table[key] then 
-				require('Module:debug').track('grc-decl/form-override')
+				require('debug').track('grc-decl/form-override')
 			end
 			form_table[key] = override_table[key] or form_table[key]
 		end
@@ -164,7 +164,7 @@ local function handle_adjective_overrides(form_table, override_table)
 			for _, number in ipairs(number_codes) do
 				local key = gender .. case .. number
 				if override_table[key] then 
-					require('Module:debug').track('grc-adecl/form-override')
+					require('debug').track('grc-adecl/form-override')
 				end
 				form_table[key] = override_table[key] or form_table[key]
 			end
@@ -723,7 +723,7 @@ local function tag(text)
 end
 
 local function print_detection_table(detection_table, labels, noun)
-	local out = require('Module:array')()
+	local out = require('array')()
 	
 	local function sort(item1, item2)
 		-- Put 'longest_nominative_ending' and 'longest_masculine_ending' first.

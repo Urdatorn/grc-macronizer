@@ -1,7 +1,7 @@
 local export = {}
 
-local m_data = require('Module:grc-utilities/data')
-local m_str_utils = require('Module:string utilities')
+local m_data = require('grc-utilities.data')
+local m_str_utils = require('string_utilities')
 local m_table = require('table')
 
 local diacritics_list = m_data.diacritics
@@ -29,7 +29,7 @@ local match = m_str_utils.match
 local lower = m_str_utils.lower
 local decompose = mw.ustring.toNFD
 
-local tokenize = require('Module:grc-utilities').tokenize
+local tokenize = require('grc-utilities').tokenize
 local copy = m_table.shallowcopy
 
 local function if_not_empty(var)
