@@ -20,7 +20,7 @@ local export = {}
 
 do
 	local loaded = package.loaded
-	local loader = package.loaders[2]
+	local loader = package.searchers[2]
 
 	--[==[
 	Like require, but return false if a module does not exist instead of throwing an error.

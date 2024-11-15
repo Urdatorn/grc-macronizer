@@ -1,4 +1,4 @@
-local module_path = 'Module:grc-decl/decl'
+local module_path = "grc-decl.decl"
 
 local m_classes = mw.loadData(module_path .. '/classes')
 local m_paradigms = mw.loadData(module_path .. '/staticdata/paradigms')
@@ -427,9 +427,9 @@ function export.get_decl(args)
 	end
 	
 	if nominative_matches[1] then
-		local m_table = require 'Module:table'
+		local m_table = require "table"
 		local fun, grc =
-			require 'Module:fun', require 'Module:languages'.getByCode 'grc'
+			require "fun", require "languages".getByCode 'grc'
 		local make_sort_key = fun.memoize(
 			function (term)
 				return (grc:makeSortKey(term))
@@ -447,7 +447,7 @@ function export.get_decl(args)
 			nominative_matches = nominative_matches[1]
 		end
 		
-		local gens = require 'Module:fun'.map(
+		local gens = require "fun".map(
 			function (gen)
 				return quote("-" .. gen)
 			end,

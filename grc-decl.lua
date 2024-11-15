@@ -1,6 +1,6 @@
 local export = {}
 
-local module_path = 'Module:grc-decl'
+local module_path = "grc-decl"
 
 local m_grc_decl_table = require(module_path .. '/table')
 local m_grc_decl_decl = require(module_path .. '/decl')

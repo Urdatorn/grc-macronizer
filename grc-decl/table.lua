@@ -1,11 +1,11 @@
-local path = 'Module:grc-decl'
+local path = "grc-decl"
 local headers = mw.loadData(path .. '/decl/classes').headers
 
 local str_find = string.find
 local str_match = string.match
 local str_gsub = string.gsub
 local ustring_gsub = mw.ustring.gsub
-local Array = require 'Module:array'
+local Array = require "array"
 
 -- Commas or slashes in the cell for a particular form are converted to this.
 local form_separator = ' / '
@@ -404,7 +404,7 @@ local function make_acs_adj(args, nums)
 	-- This should only apply to pronouns. I think.
 	-- If all of adverb, comparative, and superlative are absent, don't display
 	-- the "derived forms" part of the table at all.
-	if #nums < 3 or require 'Module:fun'.all(
+	if #nums < 3 or require "fun".all(
 			function (form_code)
 				return form_is_empty(args.atable[form_code])
 			end,

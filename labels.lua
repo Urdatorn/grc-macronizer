@@ -5,8 +5,8 @@ export.lang_specific_data_modules_prefix = "Module:labels/data/lang/"
 local m_lang_specific_data = mw.loadData(export.lang_specific_data_list_module)
 local parse_utilities_module = "Module:parse utilities"
 local string_utilities_module = "Module:string utilities"
-local table_module = "Module:table"
-local utilities_module = "Module:utilities"
+local table_module = "table"
+local utilities_module = "utilities"
 
 --[==[ intro:
 Labels go through several stages of processing to get from the original (raw) label specified in the Wikicode to the

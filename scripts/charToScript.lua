@@ -4,8 +4,8 @@ local require_when_needed = require("Module:require when needed")
 
 local cp = require_when_needed("Module:string utilities", "codepoint")
 local floor = math.floor
-local get_plaintext = require_when_needed("Module:utilities", "get_plaintext")
-local get_script = require_when_needed("Module:scripts", "getByCode")
+local get_plaintext = require_when_needed("utilities", "get_plaintext")
+local get_script = require_when_needed("scripts", "getByCode")
 local insert = table.insert
 local ipairs = ipairs
 local min = math.min
@@ -13,7 +13,7 @@ local pairs = pairs
 local setmetatable = setmetatable
 local sort = table.sort
 local split = require_when_needed("Module:string utilities", "split")
-local table_len = require_when_needed("Module:table", "length")
+local table_len = require_when_needed("table", "length")
 local type = type
 
 -- Copied from [[Module:Unicode data]].

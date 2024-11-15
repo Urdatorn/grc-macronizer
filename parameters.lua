@@ -1,16 +1,16 @@
 local export = {}
 
-local debug_track_module = "Module:debug/track"
-local families_module = "Module:families"
-local function_module = "Module:fun"
-local labels_module = "Module:labels"
-local languages_module = "Module:languages"
-local pages_module = "Module:pages"
+local debug_track_module = "debug.track"
+local families_module = "families"
+local function_module = "fun"
+local labels_module = "labels"
+local languages_module = "languages"
+local pages_module = "pages"
 local parse_utilities_module = "Module:parse utilities"
 local references_module = "Module:references"
-local scripts_module = "Module:scripts"
+local scripts_module = "scripts"
 local string_utilities_module = "Module:string utilities"
-local table_module = "Module:table"
+local table_module = "table"
 local wikimedia_languages_module = "Module:wikimedia languages"
 
 local require = require

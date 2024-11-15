@@ -164,7 +164,7 @@ local function conditionalRequire(modname, useRequire)
 end
 
 local function normalize_code(code, useRequire)
-	return conditionalRequire("Module:languages/data", useRequire).aliases[code] or code
+	return conditionalRequire("languages.data", useRequire).aliases[code] or code
 end
 
 -- Convert risky characters to HTML entities, which minimizes interference once returned (e.g. for "sms:a", "<!-- -->" etc.).
@@ -263,7 +263,7 @@ end
 local function iterateSectionSubstitutions(text, subbedChars, keepCarets, self, sc, substitution_data, function_name)
 	local fail, cats, sections = nil, {}
 	-- See [[Module:languages/data]].
-	if not find(text, "\244") or self:loadData("Module:languages/data").contiguous_substitution[self._code] then
+	if not find(text, "\244") or self:loadData("languages.data").contiguous_substitution[self._code] then
 		sections = {text}
 	else
 		sections = split(text, "\244[\128-\143][\128-\191]*", true)
@@ -546,7 +546,7 @@ function Language:getScripts()
 	if scripts == nil then
 		local codes = self:getScriptCodes()
 		if codes[1] == "All" then
-			scripts = self:loadData("Module:scripts/data")
+			scripts = self:loadData("scripts.data")
 		else
 			local get_script = require('scripts.lua').getByCode
 			scripts = {}
@@ -1681,7 +1681,7 @@ function export.getByCode(code, paramForError, allowEtymLang, allowFamily, useRe
 		error("The function getByCode expects a string as its first argument, but received " .. typ .. ".")
 	end
 	
-	local m_data = conditionalRequire("Module:languages/data", useRequire)
+	local m_data = conditionalRequire("languages.data", useRequire)
 	if m_data.aliases[code] or m_data.track[code] then
 		track(code)
 	end

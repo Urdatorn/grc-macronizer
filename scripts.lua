@@ -345,7 +345,7 @@ function export.getByCode(code, paramForError, disallowNil, useRequire)
 	if useRequire then
 		data = require("scripts.data.lua")[code]
 	else
-		data = mw.loadData("Module:scripts/data")[code]
+		data = mw.loadData("scripts.data")[code]
 	end
 	
 	local retval = export.makeObject(code, data, useRequire)

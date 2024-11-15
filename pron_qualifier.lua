@@ -1,6 +1,6 @@
 local export = {}
 
-local labels_module = "Module:labels"
+local labels_module = "labels"
 local qualifier_module = "Module:qualifier"
 local references_module = "Module:references"
 

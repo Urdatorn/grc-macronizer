@@ -59,7 +59,7 @@ end
 -- field_for_key supplies the field name in which the
 -- key will be stored.
 local function to_array(map, field_for_key)
-	m_table = m_table or require "Module:table"
+	m_table = m_table or require "table"
 	
 	local arr = {}
 	local i = 0
@@ -159,7 +159,7 @@ function Array:__index(key)
 	key = alias_of[key] or key
 	
 	local func
-	m_table = m_table or require "Module:table"
+	m_table = m_table or require "table"
 	if m_table.contains(operate_on_array, key) then
 		if m_table.contains(create_new_array, key) then
 			func = create_array_generating_func(key, m_table, "table")
@@ -167,7 +167,7 @@ function Array:__index(key)
 			func = m_table[key]
 		end
 	elseif m_table.contains(second_argument_is_array, key) then
-		m_fun = m_fun or require "Module:fun"
+		m_fun = m_fun or require "fun"
 		
 		local raw_func = reverse_arguments(get_module_function(key, m_fun, "fun"))
 		if m_table.contains(create_new_array, key) then
@@ -176,7 +176,7 @@ function Array:__index(key)
 			func = raw_func
 		end
 	elseif key == "fold" then
-		m_fun = m_fun or require "Module:fun"
+		m_fun = m_fun or require "fun"
 		
 		local raw_func = get_module_function(key, m_fun, "fun")
 		func = function(t, func, accum)
@@ -192,7 +192,7 @@ end
 
 function Array.__add(a, b)
 	if type(a) == 'table' and type(b) == 'table' then
-		m_table = m_table or require "Module:table"
+		m_table = m_table or require "table"
 		
 		local new_arr = array_constructor(m_table.shallowcopy(a))
 		
@@ -213,7 +213,7 @@ function Array:new(...)
 		-- If table has been loaded with mw.loadData, copy it to avoid the
 		-- limitations of it being a virtual table.
 		if mt and mt.mw_loadData then
-			m_table = m_table or require "Module:table"
+			m_table = m_table or require "table"
 			arr = m_table.shallowcopy(arr)
 		end
 	else
@@ -241,7 +241,7 @@ function Array_library_mt:__index(key)
 		return array_generating_funcs[key]
 	end
 	
-	m_table = m_table or require "Module:table"
+	m_table = m_table or require "table"
 	
 	if m_table.contains(create_new_array, key) then
 		local func = create_array_generating_func(key, m_table, "table")

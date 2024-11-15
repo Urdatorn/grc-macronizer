@@ -1,13 +1,13 @@
 local export = {}
 
-local anchors_module = "Module:anchors"
-local debug_track_module = "Module:debug/track"
-local links_module = "Module:links"
+local anchors_module = "anchors"
+local debug_track_module = "debug.track"
+local links_module = "links"
 local munge_text_module = "Module:munge text"
-local parameters_module = "Module:parameters"
-local scripts_module = "Module:scripts"
+local parameters_module = "parameters"
+local scripts_module = "scripts"
 local string_utilities_module = "Module:string utilities"
-local utilities_module = "Module:utilities"
+local utilities_module = "utilities"
 
 local concat = table.concat
 local insert = table.insert

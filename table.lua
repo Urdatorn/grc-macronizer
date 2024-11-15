@@ -17,7 +17,7 @@
 local export = {}
 
 local collation_module = "Module:collation"
-local function_module = "Module:fun"
+local function_module = "fun"
 
 local require = require
 

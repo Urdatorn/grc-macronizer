@@ -1562,7 +1562,7 @@ end
 
 local target = nil
 
-local get_contraction_map = require "Module:fun".memoize(function (conjugation_code)
+local get_contraction_map = require "fun".memoize(function (conjugation_code)
 	if conjugation_code:match('con') then
 		local vowel = conjugation_code:match('con%-(%a+)')
 		local contraction_type

@@ -8,6 +8,24 @@ base_dir = '.'
 module_mappings = {
     "Module:scripts/data": "scripts/data.lua",
     "Module:scripts/charToScript": "scripts/charToScript.lua",
+    "Module:headword/data": "headword/data.lua",
+    "Module:data/entities": "data/entities.lua",
+    "Module:links/data": "links/data.lua",
+    "Module:zh/data/ts": "zh/data/ts.lua",
+    "Module:zh/data/st": "zh/data/st.lua",
+    "Module:data/namespaces": "data/namespaces.lua",
+    "Module:data/interwikis": "data/interwikis.lua",
+    "Module:families/data": "families/data.lua",
+    "Module:families/data/etymology": "families/data/etymology.lua",
+    "Module:qualifier": "qualifier.lua",
+    "Module:references": "references.lua",
+    "Module:labels/data/lang": "labels/data/lang.lua",
+    "Module:labels/data": "labels/data.lua",
+    "Module:labels/data/qualifiers": "labels/data/qualifiers.lua",
+    "Module:labels/data/regional": "labels/data/regional.lua",
+    "Module:labels/data/topical": "labels/data/topical.lua",
+    "Module:yesno": "yesno.lua",
+    "Module:collation": "collation.lua",
 }
 
 # Base URL for fetching Lua modules
