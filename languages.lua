@@ -8,7 +8,7 @@ local table = table
 local ustring = mw.ustring
 
 local char = string.char
-local check_object = require('Module:utilities').check_object
+local check_object = require('utilities.lua').check_object
 local concat = table.concat
 local decode_entities = m_str_utils.decode_entities
 local decode_uri = m_str_utils.decode_uri
@@ -155,7 +155,7 @@ The following methods exist on {Language} objects to convert between different t
 ]=]
 
 local function track(page)
-	require('Module:debug/track')("languages/" .. page)
+	require('debug/track.lua')("languages/" .. page)
 	return true
 end
 
@@ -181,7 +181,7 @@ end
 -- Temporarily convert various formatting characters to PUA to prevent them from being disrupted by the substitution process.
 local function doTempSubstitutions(text, subbedChars, keepCarets, noTrim)
 	-- Clone so that we don't insert any extra patterns into the table in package.loaded. For some reason, using require seems to keep memory use down; probably because the table is always cloned.
-	local patterns = shallowcopy(require('Module:languages/data/patterns'))
+	local patterns = shallowcopy(require('languages.data.patterns'))
 	if keepCarets then
 		insert(patterns, "((\\+)%^)")
 		insert(patterns, "((%^))")
@@ -271,11 +271,11 @@ local function iterateSectionSubstitutions(text, subbedChars, keepCarets, self, 
 	for _, section in ipairs(sections) do
 		-- Don't bother processing empty strings or whitespace (which may also not be handled well by dedicated modules).
 		if gsub(section, "%s+", "") ~= "" then
-			local sub, sub_fail, sub_cats = require('Module:languages/doSubstitutions')(section, self, sc, substitution_data, function_name)
+			local sub, sub_fail, sub_cats = require('languages.doSubstitutions')(section, self, sc, substitution_data, function_name)
 			-- Second round of temporary substitutions, in case any formatting was added by the main substitution process. However, don't do this if the section contains formatting already (as it would have had to have been escaped to reach this stage, and therefore should be given as raw text).
 			if sub and subbedChars then
 				local noSub
-				for _, pattern in ipairs(require('Module:languages/data/patterns')) do
+				for _, pattern in ipairs(require('languages.data.patterns')) do
 					if match(section, pattern .. "%z?") then
 						noSub = true
 					end
@@ -399,7 +399,7 @@ function Language:getOtherNames(onlyOtherNames)
 	if #self._stack == 1 then
 		self:loadInExtraData()
 	end
-	return require('Module:language-like').getOtherNames(self, onlyOtherNames)
+	return require('language_like').getOtherNames(self, onlyOtherNames)
 end
 
 --[==[Returns a table of the aliases that the language is known by, excluding the canonical name. Aliases are synonyms for the language in question. The names are not guaranteed to be unique, in that sometimes more than one language is known by the same name. Example: {{code|lua|{"High German", "New High German", "Deutsch"} }} for [[:Category:German language|German]].]==]
@@ -427,7 +427,7 @@ function Language:getVarieties(flatten)
 	if #self._stack == 1 then
 		self:loadInExtraData()
 	end
-	return require('Module:language-like').getVarieties(self, flatten)
+	return require('language_like').getVarieties(self, flatten)
 end
 
 --[==[Returns a table of types as a lookup table (with the types as keys). 
@@ -523,7 +523,7 @@ to {true}. In other words, under normal circumstances, if the English Wikipedia 
 return value will fall back to a link to the language's category, but this won't normally happen for any other project.
 ]==]
 function Language:getWikipediaArticle(noCategoryFallback, project)
-	return require('Module:language-like').getWikipediaArticle(self, noCategoryFallback, project)
+	return require('language_like').getWikipediaArticle(self, noCategoryFallback, project)
 end
 
 function Language:makeWikipediaLink()
@@ -532,12 +532,12 @@ end
 
 --[==[Returns the name of the Wikimedia Commons category page for the language.]==]
 function Language:getCommonsCategory()
-	return require('Module:language-like').getCommonsCategory(self)
+	return require('language_like').getCommonsCategory(self)
 end
 
 --[==[Returns the Wikidata item id for the language or <code>nil</code>. This corresponds to the the second field in the data modules.]==]
 function Language:getWikidataItem()
-	return require('Module:language-like').getWikidataItem(self)
+	return require('language_like').getWikidataItem(self)
 end
 
 --[==[Returns a table of <code>Script</code> objects for all scripts that the language is written in. See [[Module:scripts]].]==]
@@ -548,7 +548,7 @@ function Language:getScripts()
 		if codes[1] == "All" then
 			scripts = self:loadData("Module:scripts/data")
 		else
-			local get_script = require('Module:scripts').getByCode
+			local get_script = require('scripts.lua').getByCode
 			scripts = {}
 			for i = 1, #codes do
 				scripts[i] = get_script(codes[i], nil, nil, self._useRequire)
@@ -592,7 +592,7 @@ function Language:findBestScript(text, forceDetect)
 	local useRequire = self._useRequire
 	
 	if not text or text == "" or text == "-" then
-		return require('Module:scripts').getByCode("None", nil, nil, useRequire)
+		return require('scripts.lua').getByCode("None", nil, nil, useRequire)
 	end
 	
 	-- Differs from table returned by getScriptCodes, as Hants is not normalized into its constituents.
@@ -606,10 +606,10 @@ function Language:findBestScript(text, forceDetect)
 	local first_sc = codes[1]
 	
 	if first_sc == "All" then
-		return require('Module:scripts').findBestScriptWithoutLang(text)
+		return require('scripts.lua').findBestScriptWithoutLang(text)
 	end
 	
-	local get_script = require('Module:scripts').getByCode
+	local get_script = require('scripts.lua').getByCode
 	local codes_len = #codes
 	
 	if not (forceDetect or first_sc == "Hants" or codes_len > 1) then
@@ -620,7 +620,7 @@ function Language:findBestScript(text, forceDetect)
 	end
 	
 	-- Remove all formatting characters.
-	text = require('Module:utilities').get_plaintext(text)
+	text = require('utilities.lua').get_plaintext(text)
 	
 	-- Remove all spaces and any ASCII punctuation. Some non-ASCII punctuation is script-specific, so can't be removed.
 	text = ugsub(text, "[%s!\"#%%&'()*,%-./:;?@[\\%]_{}]+", "")
@@ -692,7 +692,7 @@ function Language:getFamily()
 	if family == nil then
 		family = self:getFamilyCode()
 		-- If the value is nil, it's cached as false.
-		family = family and require('Module:families').getByCode(family, self._useRequire) or false
+		family = family and require('families.lua').getByCode(family, self._useRequire) or false
 		self._familyObject = family
 	end
 	return family or nil
@@ -1412,9 +1412,9 @@ function Language:transliterate(text, sc, module_override)
 	local charset = sc.characters
 	if charset and umatch(text, "[" .. charset .. "]") then
 		-- Remove any characters in Latin, which includes Latin characters also included in other scripts (as these are false positives), as well as any PUA substitutions. Anything remaining should only be script code "None" (e.g. numerals).
-		local check_text = ugsub(text, "[" .. require('Module:scripts').getByCode("Latn").characters .. "􀀀-􏿽]+", "")
+		local check_text = ugsub(text, "[" .. require('scripts.lua').getByCode("Latn").characters .. "􀀀-􏿽]+", "")
 		-- Set none_is_last_resort_only flag, so that any non-None chars will cause a script other than "None" to be returned.
-		if require('Module:scripts').findBestScriptWithoutLang(check_text, true):getCode() ~= "None" then
+		if require('scripts.lua').findBestScriptWithoutLang(check_text, true):getCode() ~= "None" then
 			return nil, true, cats
 		end
 	end
@@ -1512,7 +1512,7 @@ function Language:toJSON(returnTable)
 	if returnTable then
 		return ret
 	else
-		return require('Module:JSON').toJSON(ret)
+		return require('JSON.lua').toJSON(ret)
 	end
 end
 
@@ -1591,7 +1591,7 @@ do
 		input_code = dontCanonicalizeAliases and input_code or code
 
 		if find(data.type, "family") and not data[5] then
-			return require('Module:families').makeObject(code, data, useRequire)
+			return require('families.lua').makeObject(code, data, useRequire)
 		end
 		
 		local parent
@@ -1665,7 +1665,7 @@ end
 function export.getByCode(code, paramForError, allowEtymLang, allowFamily, useRequire)
 	-- Track uses of paramForError, ultimately so it can be removed, as error-handling should be done by [[Module:parameters]], not here.
 	if paramForError ~= nil then
-		require('Module:debug/track')("languages/paramForError")
+		require('debug/track.lua')("languages/paramForError")
 	end
 	if type(code) ~= "string" then
 		local typ
@@ -1693,12 +1693,12 @@ function export.getByCode(code, paramForError, allowEtymLang, allowFamily, useRe
 		conditionalRequire("Module:" .. modulename, useRequire)[norm_code] or
 		(allowEtymLang and require('Module:etymology languages/track-bad-etym-code')(norm_code) and conditionalRequire("Module:etymology languages/data", useRequire)[norm_code]) or
 		(allowFamily and conditionalRequire("Module:families/data", useRequire)[norm_code]) or
-		(allowEtymLang and allowFamily and require('Module:families/track-bad-etym-code')(norm_code) and conditionalRequire("Module:families/data/etymology", useRequire)[norm_code])
+		(allowEtymLang and allowFamily and require('families.track_bad_etym_code')(norm_code) and conditionalRequire("Module:families/data/etymology", useRequire)[norm_code])
 	
 	local retval = code and data and export.makeObject(code, data, useRequire)
 
 	if not retval and paramForError then
-		require('Module:languages/errorGetBy').code(code, paramForError, allowEtymLang, allowFamily)
+		require('languages.errorGetBy').code(code, paramForError, allowEtymLang, allowFamily)
 	end
 
 	return retval
@@ -1732,7 +1732,7 @@ function export.getByCanonicalName(name, errorIfInvalid, allowEtymLang, allowFam
 	local retval = code and export.getByCode(code, errorIfInvalid, allowEtymLang, allowFamily, useRequire)
 
 	if not retval and errorIfInvalid then
-		require('Module:languages/errorGetBy').canonicalName(name, allowEtymLang, allowFamily)
+		require('languages.errorGetBy').canonicalName(name, allowEtymLang, allowFamily)
 	end
 
 	return retval
@@ -1788,7 +1788,7 @@ end
 
 --[==[For backwards compatibility only; modules should require the error themselves.]==]
 function export.err(lang_code, param, code_desc, template_tag, not_real_lang)
-	return require('Module:languages/error')(lang_code, param, code_desc, template_tag, not_real_lang)
+	return require('languages.error')(lang_code, param, code_desc, template_tag, not_real_lang)
 end
 
 return export

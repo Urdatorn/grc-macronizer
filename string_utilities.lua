@@ -1,6 +1,6 @@
 local export = {}
 
-local function_module = "Module:fun"
+local function_module = "fun"
 
 local mw = mw
 local string = string
@@ -460,46 +460,47 @@ do
 	end
 
 	local function utf8_char(cp)
-		cp = tonumber(cp)
+		cp = math.floor(tonumber(cp)) -- Ensure cp is an integer
 		if cp < 0 then
-			err(format("-0x%X", -cp))
+			err(string.format("-0x%X", -cp))
 		elseif cp < 0x80 then
 			return char(cp)
 		elseif cp < 0x800 then
 			return char(
-				0xC0 + cp / 0x40,
-				0x80 + cp % 0x40
+				0xC0 + math.floor(cp / 0x40),
+				0x80 + (cp % 0x40)
 			)
 		elseif cp < 0x10000 then
 			if cp >= 0xD800 and cp < 0xE000 then
-				return "?" -- mw.ustring.char returns "?" for surrogates.
+				return "?" -- Handle surrogate pairs explicitly.
 			end
 			return char(
-				0xE0 + cp / 0x1000,
-				0x80 + cp / 0x40 % 0x40,
-				0x80 + cp % 0x40
+				0xE0 + math.floor(cp / 0x1000),
+				0x80 + math.floor(cp / 0x40) % 0x40,
+				0x80 + (cp % 0x40)
 			)
 		elseif cp < 0x110000 then
 			return char(
-				0xF0 + cp / 0x40000,
-				0x80 + cp / 0x1000 % 0x40,
-				0x80 + cp / 0x40 % 0x40,
-				0x80 + cp % 0x40
+				0xF0 + math.floor(cp / 0x40000),
+				0x80 + math.floor(cp / 0x1000) % 0x40,
+				0x80 + math.floor(cp / 0x40) % 0x40,
+				0x80 + (cp % 0x40)
 			)
 		end
-		err(format("0x%X", cp))
+		err(string.format("0x%X", cp))
 	end
-
+	
 	function export.char(cp, ...)
 		if ... == nil then
 			return utf8_char(cp)
 		end
 		local ret = {cp, ...}
-		for i = 1, select("#", cp, ...) do
+		for i = 1, #ret do
 			ret[i] = utf8_char(ret[i])
 		end
 		return concat(ret)
 	end
+	
 	u = export.char
 end
 
@@ -1005,7 +1006,7 @@ do
 end
 
 function export.pluralize(str) -- To be removed once all calling modules have been changed to call Module:en-utilities directly.
-	return require("Module:en-utilities").pluralize(str)
+	return require("en_utilities.lua").pluralize(str)
 end
 
 do

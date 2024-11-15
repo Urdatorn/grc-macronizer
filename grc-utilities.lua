@@ -1,12 +1,12 @@
 local export = {}
 
-local m_script_utils = require("Module:script utilities")
-local m_string_utils = require("Module:string utilities")
+local m_script_utils = require("script_utilities")
+local m_string_utils = require("string_utilities")
 local m_links = require("links")
 local lang = require("languages").getByCode("grc")
-local sc = require("Module:scripts").getByCode("Polyt")
+local sc = require("scripts").getByCode("Polyt")
 
-local m_data = mw.loadData("Module:grc-utilities/data")
+local m_data = mw.loadData("grc-utilities/data")
 local groups = m_data.groups
 local diacritic_order = m_data.diacritic_order
 local conversions = m_data.conversions
@@ -162,7 +162,7 @@ local function reorderDiacriticSequence(diacritics)
 				-- [[Special:WhatLinksHere/Wiktionary:Tracking/grc-utils/too many diacritics]]
 				require("debug").track("grc-utils/too many diacritics")
 				--[[
-				local m_templates = require("Module:grc-utilities/templates")
+				local m_templates = require("grc-utilities.templates")
 				error("There are two diacritics, " ..
 						m_templates.addDottedCircle(output[index]) .. " and " ..
 						m_templates.addDottedCircle(diacritic) ..
@@ -235,7 +235,7 @@ local function make_tokens(text)
 			elseif prev_info == rho_t then
 				if curr_info ~= breathing_t then
 					mw.log(string.format("The character %s in %s should not have the accent %s on it.",
-						prev, text, require("Module:grc-utilities/templates").addDottedCircle(character)))
+						prev, text, require("grc-utilities.templates").addDottedCircle(character)))
 				end
 			else
 				mw.log("The character " .. prev .. " cannot have a diacritic on it.")

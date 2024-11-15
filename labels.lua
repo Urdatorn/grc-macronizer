@@ -63,12 +63,12 @@ local function track(page, langcode, mode)
 	end
 	-- avoid including links in pages (may cause error)
 	page = page:gsub("%[", "("):gsub("%]", ")"):gsub("|", "!")
-	require("Module:debug/track")("labels/" .. page)
+	require("debug/track.lua")("labels/" .. page)
 	if langcode then
-		require("Module:debug/track")("labels/" .. page .. "/" .. langcode)
+		require("debug/track.lua")("labels/" .. page .. "/" .. langcode)
 	end
 	if mode then
-		require("Module:debug/track")("labels/" .. page .. "/" .. mode)
+		require("debug/track.lua")("labels/" .. page .. "/" .. mode)
 	end
 	-- We don't currently add a tracking label for both langcode and mode to reduce the total number of labels, to
 	-- save some memory.

@@ -50,7 +50,7 @@ end
 
 -- Creates a callable table that saves previous transliterations.
 -- Helpful because most paradigms have some syncretic forms; particularly useful for neuter forms.
-local transliterate = require('fun').memoize(require('Module:grc-translit').tr)
+local transliterate = require('fun').memoize(require('grc_translit').tr)
 
 local tag_translit = require('Module:script utilities').tag_translit
 local function format_translit(Greek_text)
@@ -343,7 +343,7 @@ function export.make_table(args)
 	output:insert(make_notes(args))
 	output:insert('|}</div></div>')
 	if args.categories[1] and mw.title.getCurrentTitle().nsText == '' then
-		output:insert(require('Module:utilities').format_categories(args.categories, lang))
+		output:insert(require('utilities.lua').format_categories(args.categories, lang))
 	end
 	
 	return output:concat() .. get_stylesheet()
@@ -489,7 +489,7 @@ function export.make_table_adj(args)
 	output:insert('|}</div></div>')
 	
 	if args.categories[1] and mw.title.getCurrentTitle().nsText == '' then
-		output:insert(require('Module:utilities').format_categories(args.categories, lang))
+		output:insert(require('utilities.lua').format_categories(args.categories, lang))
 	end
 	
 	return output:concat() .. get_stylesheet()

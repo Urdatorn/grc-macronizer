@@ -45,9 +45,9 @@ local TEMP_UNDERSCORE = u(0xFFF0)
 local function track(page, code)
 	local tracking_page = "links/" .. page
 	if code then
-		require('Module:debug/track'){tracking_page, tracking_page .. "/" .. code}
+		require('debug/track.lua'){tracking_page, tracking_page .. "/" .. code}
 	else
-		require('Module:debug/track')(tracking_page)
+		require('debug/track.lua')(tracking_page)
 	end
 	return true
 end
@@ -178,7 +178,7 @@ function export.get_link_page(target, lang, sc, plain)
 	end
 	target, escaped = target:gsub("^(\\-)\\%*", "%1*")
 
-	if not require('Module:utilities').check_object("script", true, sc) or sc:getCode() == "None" then
+	if not require('utilities.lua').check_object("script", true, sc) or sc:getCode() == "None" then
 		sc = lang:findBestScript(target)
 	end
 
@@ -292,7 +292,7 @@ local function make_link(link, lang, sc, id, isolated, plain, cats, no_alt_ast)
 	-- and either the language code is "und" or the current L2 is the current
 	-- language then return a "self-link" like the software does.
 	if link.target == mw.title.getCurrentTitle().prefixedText then
-		local fragment, current_L2 = link.fragment, require('Module:pages').get_current_L2()
+		local fragment, current_L2 = link.fragment, require('pages.lua').get_current_L2()
 		if (
 			fragment and fragment == current_L2 or
 			not (id or fragment) and (lang:getFullCode() == "und" or lang:getFullName() == current_L2)
@@ -320,7 +320,7 @@ local function make_link(link, lang, sc, id, isolated, plain, cats, no_alt_ast)
 
 		if not link.fragment then
 			if id then
-				link.fragment = lang:getFullCode() == "und" and anchor_encode(id) or require('Module:anchors').language_anchor(lang, id)
+				link.fragment = lang:getFullCode() == "und" and anchor_encode(id) or require('anchors.lua').language_anchor(lang, id)
 			elseif lang:getFullCode() ~= "und" and not (link.target:find("^Appendix:") or link.target:find("^Reconstruction:")) then
 				link.fragment = anchor_encode(lang:getFullName())
 			end
@@ -551,7 +551,7 @@ function export.plain_link(data)
 	
 	-- If we don't have a script, get one.
 	if not data.sc then
-		data.sc = require('Module:scripts').findBestScriptWithoutLang(data.alt or text)
+		data.sc = require('scripts.lua').findBestScriptWithoutLang(data.alt or text)
 	end
 	
 	-- Do we have embedded wikilinks? If so, they need to be processed individually.
@@ -834,7 +834,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 			if (
 				not data.no_nonstandard_sc_cat and
 				best:getCode() == "None" and
-				require('Module:scripts').findBestScriptWithoutLang(display_term):getCode() ~= "None"
+				require('scripts.lua').findBestScriptWithoutLang(display_term):getCode() ~= "None"
 			) then
 				insert(data.cats, data.lang:getFullName() .. " terms in nonstandard scripts")
 			end
@@ -1023,7 +1023,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 		data.tr[1] = export.language_link{
 			lang = data.lang,
 			term = data.tr[1],
-			sc = require('Module:scripts').getByCode("Latn")
+			sc = require('scripts.lua').getByCode("Latn")
 		}
 	elseif data.tr[1] and not (data.lang:link_tr(data.sc[1]) or data.tr_fail) then
 		-- Remove the pseudo-HTML tags added by remove_links.
@@ -1033,7 +1033,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 
 	insert(output, export.format_link_annotations(data, face))
 
-	local categories = #data.cats > 0 and require('Module:utilities').format_categories(data.cats, data.lang, "-", nil, nil, data.sc) or ""
+	local categories = #data.cats > 0 and require('utilities.lua').format_categories(data.cats, data.lang, "-", nil, nil, data.sc) or ""
 
 	output = concat(output)
 	if show_qualifiers then

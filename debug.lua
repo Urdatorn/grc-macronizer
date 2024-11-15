@@ -152,7 +152,7 @@ function export.modified_dump(value, prefix, tsort)
 end
 	
 
-export.track = require("Module:debug/track")
+export.track = require("debug/track.lua")
 
 
 -- Trigger a script error from a template
