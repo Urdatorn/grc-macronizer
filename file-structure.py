@@ -1,75 +1,10 @@
 import os
 import re
 
+from module_mappings import module_mappings
+
 # Base directory containing all Lua files
 base_dir = '.'
-
-# Mapping MediaWiki module paths to local paths
-module_mappings = {
-    "Module:grc-decl": "grc-decl.lua",
-    "Module:grc-conj": "grc-conj.lua",
-    "Module:grc-conj/data": "grc-conj.data.lua",
-    "Module:grc-accent": "grc-accent.lua",
-    "Module:links": "links.lua",
-    "Module:languages": "languages.lua",
-    "Module:languages/data": "languages.data.lua",
-    "Module:table": "table.lua",
-    "Module:grc-decl/shared": "grc-decl.shared.lua",
-    "Module:grc-decl/table": "grc-decl.table.lua",
-    "Module:grc-decl/decl": "grc-decl.decl.lua",
-    "Module:grc-utilities/data": "grc-utilities.data.lua",
-    "Module:string/char": "string.char.lua",
-    "Module:grc-decl/params": "grc-decl.params.lua",
-    "Module:parameters": "parameters.lua",
-    "Module:debug": "debug.lua",
-    "Module:script utilities": "script_utilities.lua",
-    "Module:grc-utilities": "grc-utilities.lua",
-    "Module:labels": "labels.lua",
-    "Module:fun": "fun.lua",
-    "Module:TemplateStyles": "TemplateStyles.lua",
-    "Module:array": "array.lua",
-    "Module:string utilities": "string_utilities.lua",
-    "Module:pron qualifier": "pron_qualifier.lua",
-    "Module:string/encode entities": "string.encode_entities.lua",
-    "Module:en-utilities": "en_utilities.lua",
-    "Module:utilities": "utilities.lua",
-    "Module:debug/track": "debug.track.lua",
-    "Module:languages/data/patterns": "languages.data.patterns.lua",
-    "Module:languages/doSubstitutions": "languages.doSubstitutions.lua",
-    "Module:language-like": "language_like.lua",
-    "Module:scripts": "scripts.lua",
-    "Module:families": "families.lua",
-    "Module:JSON": "JSON.lua",
-    "Module:families/track-bad-etym-code": "families.track_bad_etym_code.lua",
-    "Module:languages/errorGetBy": "languages.errorGetBy.lua",
-    "Module:languages/error": "languages.error.lua",
-    "Module:pages": "pages.lua",
-    "Module:anchors": "anchors.lua",
-    "Module:grc-utilities/templates": "grc-utilities.templates.lua",
-    "Module:grc-translit": "grc_translit.lua",
-    "Module:scripts/charToScript": "scripts.charToScript.lua",
-    "Module:scripts/data": "scripts.data.lua",
-    "Module:headword/data": "headword/data.lua",
-    "Module:headword/page": "headword/page.lua",
-    "Module:labels/data": "labels/data.lua",
-    "Module:labels/data/lang": "labels/data/lang.lua",
-    "Module:labels/data/regional": "labels/data/regional.lua",
-    "Module:labels/data/topical": "labels/data/topical.lua",
-    "Module:labels/data/qualifiers": "labels/data/qualifiers.lua",
-    "Module:zh/data/ts": "zh/data/ts.lua",
-    "Module:zh/data/st": "zh/data/st.lua",
-    "Module:links/data": "links/data.lua",
-    "Module:data/entities": "data/entities.lua",
-    "Module:data/namespaces": "data/namespaces.lua",
-    "Module:data/interwikis": "data/interwikis.lua",
-    "Module:families/data": "families/data.lua",
-    "Module:families/data/etymology": "families/data/etymology.lua",
-    "Module:th": "th/th.lua",
-    "Module:km": "km/km.lua",
-    "Module:yesno": "yesno/yesno.lua",
-    "Module:references": "references/references.lua",
-    "Module:collation": "collation/collation.lua",
-}
 
 # Regex patterns
 require_pattern = re.compile(r"(require\(['\"])(Module:[\w/-]+)(['\"]\))")

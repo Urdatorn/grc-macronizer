@@ -9,7 +9,7 @@ local next = next
 local remove = table.remove
 local select = select
 local sort = table.sort
-local u = require("Module:string utilities").char
+local u = require("string_utilities").char
 
 ------------------------------------------------------------------------------------
 --
