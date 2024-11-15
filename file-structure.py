@@ -28,34 +28,43 @@ module_mappings = {
     "Module:string utilities": "string_utilities",
     "Module:pron qualifier": "pron_qualifier",
     "Module:string/encode entities": "string.encode_entities",
-    "Module:en-utilities": "en_utilities.lua",
-    "Module:utilities": "utilities.lua",
-    "Module:debug/track": "debug/track.lua",
+    "Module:en-utilities": "en_utilities",
+    "Module:utilities": "utilities",
+    "Module:debug/track": "debug.track",
     "Module:languages/data/patterns": "languages.data.patterns",
     "Module:languages/doSubstitutions": "languages.doSubstitutions",
     "Module:language-like": "language_like",
-    "Module:scripts": "scripts.lua",
-    "Module:families": "families.lua",
-    "Module:JSON": "JSON.lua",
+    "Module:scripts": "scripts",
+    "Module:families": "families",
+    "Module:JSON": "JSON",
     "Module:families/track-bad-etym-code": "families.track_bad_etym_code",
     "Module:languages/errorGetBy": "languages.errorGetBy",
     "Module:languages/error": "languages.error",
-    "Module:pages": "pages.lua",
-    "Module:anchors": "anchors.lua",
+    "Module:pages": "pages",
+    "Module:anchors": "anchors",
     "Module:grc-utilities/templates": "grc-utilities.templates",
     "Module:grc-translit": "grc_translit",
-    "Module:debug/track": "debug.track.lua",
-    "Module:scripts/charToScript": "scripts.charToScript.lua",
-    "Module:scripts/data": "scripts.data.lua"
+    "Module:scripts/charToScript": "scripts.charToScript",
+    "Module:scripts/data": "scripts.data"
 }
 
 # Regex to match require statements
 require_pattern = re.compile(r"(require\(['\"])(Module:[\w/-]+)(['\"]\))")
+lua_suffix_pattern = re.compile(r"(Module:[\w/-]+)\.lua")
 
 def update_require_paths(file_path):
     """Update require paths in a Lua file to match local paths."""
     with open(file_path, 'r') as file:
         content = file.read()
+
+    # Identify and remove '.lua' suffixes from module paths in require statements
+    def remove_lua_suffix(match):
+        module_path = match.group(1)
+        print(f"Found '.lua' in {module_path}. Removing suffix.")
+        return module_path[:-4]  # Remove '.lua'
+
+    # First pass: fix module paths with '.lua'
+    content = lua_suffix_pattern.sub(remove_lua_suffix, content)
 
     # Find all require statements
     matches = require_pattern.findall(content)

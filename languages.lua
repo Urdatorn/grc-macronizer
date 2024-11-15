@@ -1,6 +1,6 @@
 local require = require
 
-local m_str_utils = require('Module:string utilities')
+local m_str_utils = require('string_utilities')
 local m_table = require('table')
 local mw = mw
 local string = string
@@ -8,7 +8,7 @@ local table = table
 local ustring = mw.ustring
 
 local char = string.char
-local check_object = require('utilities.lua').check_object
+local check_object = require('utilities').check_object
 local concat = table.concat
 local decode_entities = m_str_utils.decode_entities
 local decode_uri = m_str_utils.decode_uri

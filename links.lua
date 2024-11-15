@@ -12,15 +12,15 @@ local export = {}
 		[[Module:gender and number]]
 		[[Module:debug/track]]
 ]=]
-local m_str_utils = require('Module:string utilities')
-local pron_qualifier_module = "Module:pron qualifier"
+local m_str_utils = require('string_utilities')
+local pron_qualifier_module = "pron_qualifier"
 
 local anchor_encode = require('fun').memoize(mw.uri.anchorEncode, true)
 local concat = table.concat
 local decode_entities = m_str_utils.decode_entities
 local decode_uri = m_str_utils.decode_uri
 local find = string.find
-local encode_entities = require('Module:string/encode entities') -- Can't yet replace, as the [[Module:string utilities]] version no longer has automatic double-encoding prevention, which requires changes here to account for.
+local encode_entities = require('string.encode_entities') -- Can't yet replace, as the [[Module:string utilities]] version no longer has automatic double-encoding prevention, which requires changes here to account for.
 local insert = table.insert
 local ipairs = ipairs
 local load_data = mw.loadData

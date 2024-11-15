@@ -1,4 +1,4 @@
-local m_str_utils = require("Module:string utilities")
+local m_str_utils = require("string_utilities")
 
 local codepoint = m_str_utils.codepoint
 local decode_entities = m_str_utils.decode_entities
