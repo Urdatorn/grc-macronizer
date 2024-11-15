@@ -16,7 +16,7 @@ local hyphens = "%-‐‑‒–—"
 local diacritics
 
 local function get_diacritics()
-	diacritics = mw.loadData("Module:headword/data").page.comb_chars.diacritics_all .. "+"
+	diacritics = mw.loadData("headword/data.lua").page.comb_chars.diacritics_all .. "+"
 	return diacritics
 end
 

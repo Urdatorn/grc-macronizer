@@ -20,7 +20,7 @@ local export = {}
 
 do
 	local loaded = package.loaded
-	local loader = package.searchers[2]
+	local loader = package.loaders[2]
 
 	--[==[
 	Like require, but return false if a module does not exist instead of throwing an error.
@@ -67,7 +67,7 @@ function export.get_plaintext(text)
 
 	-- Parse internal links for the display text, and remove categories.
 	if remove_links == nil then
-		remove_links = require("links").remove_links
+		remove_links = require("links.lua").remove_links
 	end
 	text = remove_links(text)
 
@@ -167,7 +167,7 @@ do
 			else
 				if not lang then
 					if get_by_code == nil then
-						get_by_code = require("languages").getByCode
+						get_by_code = require("languages.lua").getByCode
 					end
 					lang = get_by_code("und")
 				end

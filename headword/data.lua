@@ -1,6 +1,6 @@
-local headword_page_module = "Module:headword/page"
+local headword_page_module = "headword/page.lua"
 
-local list_to_set = require("Module:table").listToSet
+local list_to_set = require("table.lua").listToSet
 
 local data = {}
 

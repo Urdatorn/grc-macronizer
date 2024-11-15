@@ -15,5 +15,5 @@ m["ira-old"] = {
 	wikipedia_article = "Old Iranian languages",
 }
 
-m = require("Module:languages").addDefaultTypes(m, false, "family")
-return require("Module:languages").finalizeEtymologyData(m)
+m = require("languages.lua").addDefaultTypes(m, false, "family")
+return require("languages.lua").finalizeEtymologyData(m)

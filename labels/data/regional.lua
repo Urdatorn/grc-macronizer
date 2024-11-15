@@ -436,4 +436,4 @@ labels["Wade–Giles"] = {
 }
 
 
-return require("Module:labels").finalize_data(labels)
+return require("labels.lua").finalize_data(labels)

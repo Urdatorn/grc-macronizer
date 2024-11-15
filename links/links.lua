@@ -12,15 +12,15 @@ local export = {}
 		[[Module:gender and number]]
 		[[Module:debug/track]]
 ]=]
-local m_str_utils = require('string_utilities')
-local pron_qualifier_module = "pron_qualifier"
+local m_str_utils = require("Module:string utilities")
+local pron_qualifier_module = "Module:pron qualifier"
 
-local anchor_encode = require('fun').memoize(mw.uri.anchorEncode, true)
+local anchor_encode = require("fun.lua").memoize(mw.uri.anchorEncode, true)
 local concat = table.concat
 local decode_entities = m_str_utils.decode_entities
 local decode_uri = m_str_utils.decode_uri
 local find = string.find
-local encode_entities = require('string.encode_entities') -- Can't yet replace, as the [[Module:string utilities]] version no longer has automatic double-encoding prevention, which requires changes here to account for.
+local encode_entities = require("Module:string/encode entities") -- Can't yet replace, as the [[Module:string utilities]] version no longer has automatic double-encoding prevention, which requires changes here to account for.
 local insert = table.insert
 local ipairs = ipairs
 local load_data = mw.loadData
@@ -28,7 +28,7 @@ local match = string.match
 local new_title = mw.title.new
 local pairs = pairs
 local remove = table.remove
-local shallowcopy = require('table').shallowcopy
+local shallowcopy = require("table.lua").shallowcopy
 local split = m_str_utils.split
 local sub = string.sub
 local toNFC = mw.ustring.toNFC
@@ -45,9 +45,9 @@ local TEMP_UNDERSCORE = u(0xFFF0)
 local function track(page, code)
 	local tracking_page = "links/" .. page
 	if code then
-		require('debug/track.lua'){tracking_page, tracking_page .. "/" .. code}
+		require("debug.track.lua"){tracking_page, tracking_page .. "/" .. code}
 	else
-		require('debug/track.lua')(tracking_page)
+		require("debug.track.lua")(tracking_page)
 	end
 	return true
 end
@@ -178,7 +178,7 @@ function export.get_link_page(target, lang, sc, plain)
 	end
 	target, escaped = target:gsub("^(\\-)\\%*", "%1*")
 
-	if not require('utilities.lua').check_object("script", true, sc) or sc:getCode() == "None" then
+	if not require("utilities.lua").check_object("script", true, sc) or sc:getCode() == "None" then
 		sc = lang:findBestScript(target)
 	end
 
@@ -292,7 +292,7 @@ local function make_link(link, lang, sc, id, isolated, plain, cats, no_alt_ast)
 	-- and either the language code is "und" or the current L2 is the current
 	-- language then return a "self-link" like the software does.
 	if link.target == mw.title.getCurrentTitle().prefixedText then
-		local fragment, current_L2 = link.fragment, require('pages.lua').get_current_L2()
+		local fragment, current_L2 = link.fragment, require("pages.lua").get_current_L2()
 		if (
 			fragment and fragment == current_L2 or
 			not (id or fragment) and (lang:getFullCode() == "und" or lang:getFullName() == current_L2)
@@ -320,7 +320,7 @@ local function make_link(link, lang, sc, id, isolated, plain, cats, no_alt_ast)
 
 		if not link.fragment then
 			if id then
-				link.fragment = lang:getFullCode() == "und" and anchor_encode(id) or require('anchors.lua').language_anchor(lang, id)
+				link.fragment = lang:getFullCode() == "und" and anchor_encode(id) or require("anchors.lua").language_anchor(lang, id)
 			elseif lang:getFullCode() ~= "und" and not (link.target:find("^Appendix:") or link.target:find("^Reconstruction:")) then
 				link.fragment = anchor_encode(lang:getFullName())
 			end
@@ -544,14 +544,14 @@ function export.plain_link(data)
 	-- Make sure the language is "und".
 	local lang = data.lang
 	if not lang or lang:getCode() ~= "und" then
-		data.lang = require('languages').getByCode("und")
+		data.lang = require("languages.lua").getByCode("und")
 	end
 	
 	local text = data.term
 	
 	-- If we don't have a script, get one.
 	if not data.sc then
-		data.sc = require('scripts.lua').findBestScriptWithoutLang(data.alt or text)
+		data.sc = require("scripts.lua").findBestScriptWithoutLang(data.alt or text)
 	end
 	
 	-- Do we have embedded wikilinks? If so, they need to be processed individually.
@@ -655,7 +655,7 @@ function export.format_link_annotations(data, face)
 	end
 
 	if data.genders and #data.genders > 0 then
-		local m_gen = require('Module:gender and number')
+		local m_gen = require("Module:gender and number")
 		insert(output, "&nbsp;" .. m_gen.format_list(data.genders, data.lang))
 	end
 
@@ -672,13 +672,13 @@ function export.format_link_annotations(data, face)
 
 		if data.tr[1] and data.ts[1] then
 			insert(annotations,
-				require('Module:script utilities').tag_translit(data.tr[1], data.lang, kind)
+				require("Module:script utilities").tag_translit(data.tr[1], data.lang, kind)
 				.. " " .. export.mark(data.ts[1], "ts"))
 		elseif data.ts[1] then
 			insert(annotations, export.mark(data.ts[1], "ts"))
 		else
 			insert(annotations,
-				require('Module:script utilities').tag_translit(data.tr[1], data.lang, kind))
+				require("Module:script utilities").tag_translit(data.tr[1], data.lang, kind))
 		end
 	end
 
@@ -834,7 +834,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 			if (
 				not data.no_nonstandard_sc_cat and
 				best:getCode() == "None" and
-				require('scripts.lua').findBestScriptWithoutLang(display_term):getCode() ~= "None"
+				require("scripts.lua").findBestScriptWithoutLang(display_term):getCode() ~= "None"
 			) then
 				insert(data.cats, data.lang:getFullName() .. " terms in nonstandard scripts")
 			end
@@ -943,13 +943,13 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 				cats = data.cats,
 				no_alt_ast = data.no_alt_ast
 			}
-			link = require('Module:script utilities').tag_text(
+			link = require("Module:script utilities").tag_text(
 				data.term[i] and export.language_link(term_data)
 				or data.alt[i], data.lang, data.sc[i], face, class)
 		else
 			--[[	No term to show.
 					Is there at least a transliteration we can work from?	]]
-			link = require('Module:script utilities').request_script(data.lang, data.sc[i])
+			link = require("Module:script utilities").request_script(data.lang, data.sc[i])
 			-- No link to show, and no transliteration either. Show a term request (unless it's a substrate, as they rarely take terms).
 			if (link == "" or (not data.tr[i]) or data.tr[i] == "-") and data.lang:getFamilyCode() ~= "qfa-sub" then
 				-- If there are multiple terms, break the loop instead.
@@ -1023,7 +1023,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 		data.tr[1] = export.language_link{
 			lang = data.lang,
 			term = data.tr[1],
-			sc = require('scripts.lua').getByCode("Latn")
+			sc = require("scripts.lua").getByCode("Latn")
 		}
 	elseif data.tr[1] and not (data.lang:link_tr(data.sc[1]) or data.tr_fail) then
 		-- Remove the pseudo-HTML tags added by remove_links.
@@ -1033,7 +1033,7 @@ function export.full_link(data, face, allow_self_link, show_qualifiers)
 
 	insert(output, export.format_link_annotations(data, face))
 
-	local categories = #data.cats > 0 and require('utilities.lua').format_categories(data.cats, data.lang, "-", nil, nil, data.sc) or ""
+	local categories = #data.cats > 0 and require("utilities.lua").format_categories(data.cats, data.lang, "-", nil, nil, data.sc) or ""
 
 	output = concat(output)
 	if show_qualifiers then

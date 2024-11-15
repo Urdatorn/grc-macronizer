@@ -235,4 +235,4 @@ labels["with respect to"] = {
 	omit_postComma = true,
 }
 
-return require("Module:labels").finalize_data(labels)
+return require("labels.lua").finalize_data(labels)

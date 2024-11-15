@@ -16,7 +16,7 @@
 
 local export = {}
 
-local collation_module = "Module:collation"
+local collation_module = "collation/collation.lua"
 local function_module = "fun"
 
 local require = require

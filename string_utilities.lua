@@ -750,7 +750,7 @@ do
 			return x == "" and decode_numeric_entity(code, "^%d+$") or
 				decode_numeric_entity(code, "^%x+$", 16)
 		end
-		entities = entities or load_data("Module:data/entities")
+		entities = entities or load_data("data/entities.lua")
 		return entities[x .. code]
 	end
 

@@ -5,8 +5,8 @@ export.lang_specific_data_modules_prefix = "Module:labels/data/lang/"
 local m_lang_specific_data = mw.loadData(export.lang_specific_data_list_module)
 local parse_utilities_module = "Module:parse utilities"
 local string_utilities_module = "Module:string utilities"
-local table_module = "table"
-local utilities_module = "utilities"
+local table_module = "table.lua"
+local utilities_module = "utilities.lua"
 
 --[==[ intro:
 Labels go through several stages of processing to get from the original (raw) label specified in the Wikicode to the
@@ -63,12 +63,12 @@ local function track(page, langcode, mode)
 	end
 	-- avoid including links in pages (may cause error)
 	page = page:gsub("%[", "("):gsub("%]", ")"):gsub("|", "!")
-	require("debug/track.lua")("labels/" .. page)
+	require("debug.track.lua")("labels/" .. page)
 	if langcode then
-		require("debug/track.lua")("labels/" .. page .. "/" .. langcode)
+		require("debug.track.lua")("labels/" .. page .. "/" .. langcode)
 	end
 	if mode then
-		require("debug/track.lua")("labels/" .. page .. "/" .. mode)
+		require("debug.track.lua")("labels/" .. page .. "/" .. mode)
 	end
 	-- We don't currently add a tracking label for both langcode and mode to reduce the total number of labels, to
 	-- save some memory.

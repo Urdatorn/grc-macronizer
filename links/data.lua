@@ -3,8 +3,8 @@ local u = require("Module:string utilities").char
 local data = {}
 
 data.phonetic_extraction = {
-	["th"] = "Module:th",
-	["km"] = "Module:km",
+	["th"] = "th/th.lua",
+	["km"] = "km/km.lua",
 }
 
 data.ignored_prefixes = {

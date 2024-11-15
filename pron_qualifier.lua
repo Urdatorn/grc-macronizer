@@ -2,7 +2,7 @@ local export = {}
 
 local labels_module = "labels"
 local qualifier_module = "Module:qualifier"
-local references_module = "Module:references"
+local references_module = "references/references.lua"
 
 local function track(page)
 	require("debug/track.lua")("pron qualifier/" .. page)

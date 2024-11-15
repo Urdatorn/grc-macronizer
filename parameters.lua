@@ -7,7 +7,7 @@ local labels_module = "labels"
 local languages_module = "languages"
 local pages_module = "pages"
 local parse_utilities_module = "Module:parse utilities"
-local references_module = "Module:references"
+local references_module = "references/references.lua"
 local scripts_module = "scripts"
 local string_utilities_module = "Module:string utilities"
 local table_module = "table"
@@ -46,7 +46,7 @@ local tonumber = tonumber
 local tostring = tostring
 local trim = m_str_utils.trim
 local type = type
-local yesno = require_when_needed("Module:yesno")
+local yesno = require_when_needed("yesno/yesno.lua")
 
 local current_title -- Current title.
 local current_namespace -- Current namespace.

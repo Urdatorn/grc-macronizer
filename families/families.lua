@@ -38,7 +38,7 @@ function export.makeObject(code, data, useRequire)
 	end
 
 	function Family:getOtherNames(onlyOtherNames)
-		return require("language_like").getOtherNames(self, onlyOtherNames)
+		return require("language_like.lua").getOtherNames(self, onlyOtherNames)
 	end
 
 	function Family:getAliases()
@@ -46,7 +46,7 @@ function export.makeObject(code, data, useRequire)
 	end
 
 	function Family:getVarieties(flatten)
-		return require("language_like").getVarieties(self, flatten)
+		return require("language_like.lua").getVarieties(self, flatten)
 	end
 
 
@@ -151,7 +151,7 @@ function export.makeObject(code, data, useRequire)
 		if self._parentObject == nil then
 			local parentCode = self:getParentCode()
 			if parentCode then
-				self._parentObject = require("languages").getByCode(parentCode, nil, true, true, useRequire)
+				self._parentObject = require("languages.lua").getByCode(parentCode, nil, true, true, useRequire)
 			else
 				self._parentObject = false
 			end
@@ -212,7 +212,7 @@ function export.makeObject(code, data, useRequire)
 		if not self._fullObject then
 			local fullCode = self:getFullCode()
 			if fullCode ~= self:getCode() then
-				self._fullObject = require("languages").getByCode(fullCode, nil, nil, true, useRequire)
+				self._fullObject = require("languages.lua").getByCode(fullCode, nil, nil, true, useRequire)
 			else
 				self._fullObject = self
 			end
@@ -251,7 +251,7 @@ function export.makeObject(code, data, useRequire)
 	]==]
 	function Family:getProtoLanguage()
 		if self._protoLanguageObject == nil then
-			self._protoLanguageObject = require("languages").getByCode(self._rawData.protoLanguage or self:getCode() .. "-pro", nil, true, nil, useRequire) or false
+			self._protoLanguageObject = require("languages.lua").getByCode(self._rawData.protoLanguage or self:getCode() .. "-pro", nil, true, nil, useRequire) or false
 		end
 		return self._protoLanguageObject or nil
 	end
@@ -304,7 +304,7 @@ function export.makeObject(code, data, useRequire)
 		-- Iterate over all three datasets.
 		for _, data in ipairs{languages, etymology_languages, families} do
 			for code in pairs(data) do
-				local lang = require("languages").getByCode(code, nil, true, true, useRequire)
+				local lang = require("languages.lua").getByCode(code, nil, true, true, useRequire)
 				if lang:inFamily(self) then
 					if format == "object" then
 						insert(descendants, lang)
@@ -343,7 +343,7 @@ function export.makeObject(code, data, useRequire)
 	function Family:hasDescendant(...)
 		for _, lang in ipairs{...} do
 			if type(lang) == "string" then
-				lang = require("languages").getByCode(lang, nil, true, nil, useRequire)
+				lang = require("languages.lua").getByCode(lang, nil, true, nil, useRequire)
 			end
 			if lang:inFamily(self) then
 				return true
@@ -382,7 +382,7 @@ function export.makeObject(code, data, useRequire)
 
 	--[==[Returns the Wikidata item id for the family or <code>nil</code>. This corresponds to the the second field in the data modules.]==]
 	function Family:getWikidataItem()
-		return require("language_like").getWikidataItem(self)
+		return require("language_like.lua").getWikidataItem(self)
 	end
 
 	--[==[
@@ -398,7 +398,7 @@ function export.makeObject(code, data, useRequire)
 	return value will fall back to a link to the family's category, but this won't normally happen for any other project.
 	]==]
 	function Family:getWikipediaArticle(noCategoryFallback, project)
-		return require("language_like").getWikipediaArticle(self, noCategoryFallback, project)
+		return require("language_like.lua").getWikipediaArticle(self, noCategoryFallback, project)
 	end
 
 	function Family:makeWikipediaLink()
@@ -407,7 +407,7 @@ function export.makeObject(code, data, useRequire)
 
 	--[==[Returns the name of the Wikimedia Commons category page for the family.]==]
 	function Family:getCommonsCategory()
-		return require("language_like").getCommonsCategory(self)
+		return require("language_like.lua").getCommonsCategory(self)
 	end
 
 	function Family:toJSON()
@@ -456,7 +456,7 @@ function export.getByCode(code, useRequire)
 
 	data = conditionalRequire("families/data/etymology.lua", useRequire)[code]
 	if data then
-		return require("languages").makeObject(code, data, useRequire)
+		return require("languages.lua").makeObject(code, data, useRequire)
 	end
 
 	return nil

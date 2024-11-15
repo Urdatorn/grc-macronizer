@@ -6246,4 +6246,4 @@ m["znd"] = {
 	"nic-ubg",
 }
 
-return require("Module:languages").addDefaultTypes(m, true, "family")
+return require("languages.lua").addDefaultTypes(m, true, "family")
