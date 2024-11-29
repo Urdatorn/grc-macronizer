@@ -15,3 +15,11 @@ macronizer workflow
 
 NB
 - Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
+
+
+```mermaid
+graph TD
+    Start --> Decision{Is it working?}
+    Decision -->|Yes| Success[Success!]
+    Decision -->|No| Fix[Fix it]
+    Fix --> Start
