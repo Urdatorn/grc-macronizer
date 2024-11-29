@@ -1,7 +1,5 @@
-# TO-DO
+# Macronizing the TLG 
 
-- find all wiktionary titles to scrape
-- GPT4o for morphology
 
 
 macronizer workflow
@@ -19,6 +17,19 @@ NB
 
 Example: ἵσταμαι ^ (present), ἵσταμαι - (imperfect)
 
+## Macronizer work-flow for open-syllable dichrona in the TLG:
+
+_Notes_:
+- A dichronon (pl. dichrona) is a α, ι or υ (alpha, iota or ypsilon) outside of diphthongs. Alpha with iota subscriptum (ᾳ) is a s.c. long diphthong, and hence not a dichronon.
+- The theoretical goal "in the limit" is that all open syllables be macronized. Hence, no syllable weights are implied; every open-syllable dichronon not explicitly macronized is considered ambiguous. 
+- By 'macronizing' is meant adding either a macron (symbol: dash, -) or breve (symbol: caret, ^). Analogously, 'macron/macra' is shorthand for 'macron/macra and breve/brevia'.
+- A word is considered 'macronized', when every dichronon in it is mapped to a - or ^ or explicitly marked as problematic.
+- Likewise, a sentence is considered 'macronized', when every word in it is macronized.
+- Hence, the TLG is considered 'macronized' when every sentence in it is macronized.
+
+_Specifics of the flow chart_
+- Macronizing does not overwrite earlier macrons, i.e. the results of "upstream" macronizing, unless otherwise stated (which does occur).
+
 ```mermaid
 graph TD
     classDef commentStyle fill:transparent,stroke:none,font-size:12px,font-style:italic;
@@ -27,14 +38,24 @@ graph TD
     classDef formStyle fill:#FFFFE0,stroke:#FFD700,stroke-width:2px;
     linkStyle default stroke-width:3px;
 
-    TLG[Sentence with dichrona in TLG] --> OdyCy
+    Sentence[Sentence in TLG] --> DecisionSentence{Dichrona?}
+    DecisionSentence -->|Yes| SentenceDichrona[Sentence with dichrona]
+    DecisionSentence -->|No, next sentence| Sentence
+    SentenceDichrona --> DecideHypotactic{Scansion exists?}
+    DecideHypotactic -->|Yes| MacronizeOpen[Macronize all open syllables!]:::successStyle
+    MacronizeOpen --> OdyCy
+    DecideHypotactic -->|No| OdyCy
     OdyCy --> Word
     Word --> Dichrona{Dichrona?}
     Dichrona -->|Yes| WordDichrona
     Dichrona -->|No| NextWord[Move to next word]
     NextWord --> Word
-    Meter((Optional: Meter)) -.-> WordDichrona[Word with dichrona]:::formStyle
-    WordDichrona --> Decision{Word in db?}
+    WordDichrona --> Rules[Accentuation-rule algorithm]
+    Rules --> Solved{Still ambiguity?}
+    Solved -->|Yes| Decision{Word in db?}
+    Solved -->|No| Success
+    Meter((Optional tag: meter)) -.-> WordDichrona[Word with dichrona]:::formStyle
+    Dialect((Optionaltag: Doric)) -.-> WordDichrona:::formStyle
     Decision -->|Yes, exactly 1 match| Success[Macronize!]:::successStyle
     Decision -->|Yes, but > 1 matches differing w.r.t. macrons| MorphSelector{Compare OdyCy analysis with db forms}
     Decision -->|No| MorphBoundaries[Mark morpheme boundaries with ChatGPT API]
