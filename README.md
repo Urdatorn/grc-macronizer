@@ -11,10 +11,78 @@ macronizer workflow
    2) apply algorithmic morph rules
    3) if still undecided, send to GPT
 
-NB
-- Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
+### Methodological problem
+
+- Specific problem 1: Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
+
+From the grc-decl docs https://youtu.be/nwEgqqofpLk?si=3WpKhLktjb3bVvQt :
 
 
+>The module adds a breve or macron to mark the length of the monophthongs α, ι, υ (a, i, u) if they do not bear a macron, breve, circumflex, or iota subscript and the length can be deduced from the rules of accent. Thus, {{grc-decl|ἄστρον|ἄστρου}} generates the same forms as {{grc-decl|ᾰ̓́στρον|ᾰ̓́στρου}}. This is done by the mark_implied_length and harmonize_length functions in Module:grc-accent. 
+
+
+
+```
+function export.mark_implied_length(word, return_tokens, short_diphthong)
+	word = decompose(word)
+	-- Do nothing if there are no vowel letters that could be ambiguous.
+	if not find(word, either_vowel) then
+		if return_tokens then
+			return tokenize(word)
+		else
+			return word
+		end
+	end
+	
+	local tokens = shallowcopy(tokenize(word))
+	local vowels = export.get_vowel_info(tokens, short_diphthong)
+	
+	if #vowels >= 2 then
+		local ultima = vowels[1]
+		local ultima_i = ultima.index
+		
+		local penult = vowels[2]
+		local penult_i = penult.index
+		
+		if penult.length == "either" and ultima.length == "short" then
+			if penult.accent == CIRCUMFLEX then
+				tokens[penult_i] = add(tokens[penult_i], MACRON)
+			elseif penult.accent == ACUTE then
+				tokens[penult_i] = add(tokens[penult_i], BREVE)
+			end
+		elseif penult.length == "long" and ultima.length == "either" then
+			if penult.accent == CIRCUMFLEX then
+				tokens[ultima_i] = add(tokens[ultima_i], BREVE)
+			elseif penult.accent == ACUTE then
+				tokens[ultima_i] = add(tokens[ultima_i], MACRON)
+			end
+		end
+		
+		local antepenult = vowels[3]
+		if antepenult and antepenult.accent and ultima.length == "either" then
+			tokens[ultima_i] = add(tokens[ultima_i], BREVE)
+		end
+	end
+	
+	if return_tokens then
+		return tokens
+	else
+		return table.concat(tokens)
+	end
+end
+```
+
+So what is in here? We have the σωτῆρα-rule:
+```
+if penult.length == "either" and ultima.length == "short" then
+    if penult.accent == CIRCUMFLEX then
+        tokens[penult.index] = add(tokens[penult.index], MACRON)
+    elseif penult.accent == ACUTE then
+        tokens[penult.index] = add(tokens[penult.index], BREVE)
+    end
+```
+
+## rfdrfdf
 Example: ἵσταμαι ^ (present), ἵσταμαι - (imperfect)
 
 ## Macronizer work-flow for open-syllable dichrona in the TLG:
