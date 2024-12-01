@@ -1,6 +1,6 @@
 # Macronizing the TLG 
 
-
+					
 
 macronizer workflow
 1) apply rules of accentuation
@@ -11,7 +11,7 @@ macronizer workflow
    2) apply algorithmic morph rules
    3) if still undecided, send to GPT
 
-### Methodological problem
+### Methodological problem										
 
 - Specific problem 1: Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
 
@@ -20,9 +20,9 @@ From the grc-decl docs https://youtu.be/nwEgqqofpLk?si=3WpKhLktjb3bVvQt :
 
 >The module adds a breve or macron to mark the length of the monophthongs α, ι, υ (a, i, u) if they do not bear a macron, breve, circumflex, or iota subscript and the length can be deduced from the rules of accent. Thus, {{grc-decl|ἄστρον|ἄστρου}} generates the same forms as {{grc-decl|ᾰ̓́στρον|ᾰ̓́στρου}}. This is done by the mark_implied_length and harmonize_length functions in Module:grc-accent. 
 
+However, the function ```mark_implied_length``` only contains 
 
-
-```
+```lua
 function export.mark_implied_length(word, return_tokens, short_diphthong)
 	word = decompose(word)
 	-- Do nothing if there are no vowel letters that could be ambiguous.
@@ -43,13 +43,14 @@ function export.mark_implied_length(word, return_tokens, short_diphthong)
 		
 		local penult = vowels[2]
 		local penult_i = penult.index
-		
+		-- ALBIN: the σωτῆρα-rule for the penult (For words with penultimate accent and short ultima, acute implies short penult.) and first circumflex rule
 		if penult.length == "either" and ultima.length == "short" then
 			if penult.accent == CIRCUMFLEX then
 				tokens[penult_i] = add(tokens[penult_i], MACRON)
 			elseif penult.accent == ACUTE then
 				tokens[penult_i] = add(tokens[penult_i], BREVE)
 			end
+		-- ALBIN: the σωτῆρα-rule for the ultima (For words with penultimate accent and long penult, acute implies long ultima) and second circumflex rule
 		elseif penult.length == "long" and ultima.length == "either" then
 			if penult.accent == CIRCUMFLEX then
 				tokens[ultima_i] = add(tokens[ultima_i], BREVE)
@@ -57,7 +58,8 @@ function export.mark_implied_length(word, return_tokens, short_diphthong)
 				tokens[ultima_i] = add(tokens[ultima_i], MACRON)
 			end
 		end
-		
+
+		-- ALBIN: antepenult-rule
 		local antepenult = vowels[3]
 		if antepenult and antepenult.accent and ultima.length == "either" then
 			tokens[ultima_i] = add(tokens[ultima_i], BREVE)
@@ -72,14 +74,20 @@ function export.mark_implied_length(word, return_tokens, short_diphthong)
 end
 ```
 
-So what is in here? We have the σωτῆρα-rule:
+The key implementation of defaulting to brevia is found in the ```grc-accent``` module:
+
 ```
-if penult.length == "either" and ultima.length == "short" then
-    if penult.accent == CIRCUMFLEX then
-        tokens[penult.index] = add(tokens[penult.index], MACRON)
-    elseif penult.accent == ACUTE then
-        tokens[penult.index] = add(tokens[penult.index], BREVE)
+[BREVE] = function(vowel)
+    if find(vowel, "[" .. long_diacritics .. "]") then
+        error("The vowel " .. vowel .. 
+              " has a iota subscript, a macron, or a circumflex, so a breve cannot be added to it.")
+    elseif is_diphthong(vowel) then
+        error("The vowel " .. vowel .. 
+              " is a diphthong, so a breve cannot be added to it.")
+    else
+        return (gsub(vowel, "(" .. either_vowel .. ")", "%1" .. BREVE))
     end
+end
 ```
 
 ## rfdrfdf
