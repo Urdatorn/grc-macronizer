@@ -13,6 +13,12 @@ macronizer workflow
 
 ### Methodological problem										
 
+Wiktionary works under the following conventions:
+
+>Some dictionaries and lexicons operate under the standard that an unmarked vowel is short, while a long vowel will have a macron. In Wiktionary, an unmarked vowel is considered ambiguous; short vowels should be marked with breves. For instance, the second iota of πολῑτικός (polītikós) is considered ambiguous; this word should be spelled πολῑτῐκός (polītikós), with a breve on the second iota to indicate that it is short. 
+
+Cf. https://en.wiktionary.org/wiki/Wiktionary:About_Ancient_Greek (accessed 4 dec. 2024)
+
 - Specific problem 1: Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
 
 From the grc-decl docs https://youtu.be/nwEgqqofpLk?si=3WpKhLktjb3bVvQt :
