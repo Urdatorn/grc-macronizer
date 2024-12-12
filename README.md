@@ -2,14 +2,25 @@
 
 					
 
-macronizer workflow
-1) apply rules of accentuation
-2) if the line of the word is scanned in hypotactic, check that
-3) check "hardcoded" database
+## Macronizer Workflow
+1) if the line of the word is scanned in hypotactic, check that for open syllables
+2) apply the 4 rules of accentuation
+3) check "hardcoded" database (= '''grc_final.json''', Wiktionary)
 4) if not in db:
-   1) get morphemes from GPT API
-   2) apply algorithmic morph rules
-   3) if still undecided, send to GPT
+   1) get POS from OdyCy
+   2) get morpheme boundaries from GPT API
+   3) apply my algorithmic morph-POS-based rules
+      1) Endings according to conjugations and declinations
+   4) if still undecided, send to GPT
+
+**NB1:** The "paroxytone + short ultima" rule for the penultima *depends on endings having been macronized* since a huge amount of words end on dichrona. Likewise, the "paroxytone + long penultima" for the ultima *depends on penultima having been macronized*, to the extent penultima are dichronic. Hence these two rules should be run 
+
+## Conventions/Priorities
+1) Successful macronization of a corpus is gauged solely on the basis of:
+   1)  open syllables and
+   2)  excludes line-final syllables (syllaba brevis in positio longo)
+   
+When all non-final dichrona in open syllables are disambiguated, the project is complete. 
 
 ### Methodological problem										
 
