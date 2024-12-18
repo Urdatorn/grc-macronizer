@@ -11,14 +11,21 @@ When all *non-final dichrona in open syllables* are disambiguated, the project i
 ## Macronizer work-flow for open-syllable dichrona in the TLG:
 
 _Notes_:
-- A dichronon (pl. dichrona) is a α, ι or υ (alpha, iota or ypsilon) outside of diphthongs. Alpha with iota subscriptum (ᾳ) is a s.c. long diphthong, and hence not a dichronon.
-- The theoretical goal "in the limit" is that all open syllables be macronized. Hence, no syllable weights are implied; every open-syllable dichronon not explicitly macronized is considered ambiguous. 
-- By 'macronizing' is meant adding either a macron (symbol: dash, -) or breve (symbol: caret, ^). Analogously, 'macron/macra' is shorthand for 'macron/macra and breve/brevia'.
-- A word is considered 'macronized', when every dichronon in it is mapped to a - or ^ or explicitly marked as problematic.
-- Likewise, a sentence is considered 'macronized', when every word in it is macronized.
-- Hence, the TLG is considered 'macronized' when every sentence in it is macronized.
+- A dichronon (pl. dichrona) is an α, ι or υ (alpha, iota or ypsilon) **without circumflex** and **outside of diphthongs**. Alpha with iota subscriptum (ᾳ) is a s.c. long diphthong, and hence not a dichronon.
+- The theoretical goal "in the limit" is that all **open syllables** be macronized: in practice, we can only say with full certainty that all dichrona appearing at least once in open syllables **in metrical poetry** can be macronized. For those dichrona that do not, we either rely on Ancient grammarians and the induction of modern historical linguists or pure speculation.
+- By *true dichronon*, I mean a dichronon not disambiguated by any of the following four **accentuation rules** for Attic Greek:
+   - the σωτῆρᾰ rule for penultimae 
+   - the two σωτῆρᾰ rules for ultimae
+   - the proparoxytone rule for ultimae
+- Convention: the vowel lengths of **true dichrona in open syllables** are never considered implied; all other vowel lengths are considered implied.
+- By *macronizing* is meant disambiguating true dichrona. This can be done by adding macra and brevia as diacritics, or through for example vowel-length XML-tags.
+- I will use 'macron/macra/macrons' as shorthand for 'macron/macra/macrons and breve/brevia'.
+- A word is considered *macronized*, when every open syllable in it has been macronized (or, if there is an impasse, explicitly marked as problematic).
+- Likewise, a sentence is considered macronized, when every word in it has been macronized.
+- In poetry, the sentence level introduces metrical constraints on dichrona, while the metre itself is recursively constrained by the dichrona in a hermeneutic circle.
+- The TLG is considered macronized when every sentence in it has been macronized.
 
-- **NB1:** The "paroxytone + short ultima" rule for the penultima *depends on endings having been macronized* since a huge amount of words end on dichrona. Likewise, the "paroxytone + long penultima" for the ultima *depends on penultima having been macronized*, to the extent penultima are dichronic. Hence these two rules should be run 
+- **NB1:** The "paroxytone + short ultima" rule for the penultima *depends on endings having been macronized* since a huge amount of words end on dichrona. Likewise, the "paroxytone + long penultima" for the ultima *depends on penultima having been macronized*, to the extent penultima are dichronic.
 
 _Specifics of the flow chart_
 - Macronizing does not overwrite earlier macrons, i.e. the results of "upstream" macronizing, unless otherwise stated (which does occur).
