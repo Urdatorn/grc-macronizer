@@ -40,7 +40,7 @@ def macronize(word):
         return None  # No match found
 
 # Test Cases (with limited output)
-test_words = ['ἀσφαλής']
+test_words = ['ἀσφαλής', 'γίγνονται']
 for word in test_words:
     result = macronize(word)
     print(f"{word} -> {result}")
