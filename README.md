@@ -8,9 +8,9 @@
 When all *non-final dichrona in open syllables* are disambiguated, the project is complete. 
 
 
-## Macronizer work-flow for open-syllable dichrona in the TLG:
+## Work flow for the TLG macronizer:
 
-_Notes_:
+_Notes and definitions_:
 - A dichronon (pl. dichrona) is an α, ι or υ (alpha, iota or ypsilon) **without circumflex** and **outside of diphthongs**. Alpha with iota subscriptum (ᾳ) is a s.c. long diphthong, and hence not a dichronon.
 - The theoretical goal "in the limit" is that all **open syllables** be macronized: in practice, we can only say with full certainty that all dichrona appearing at least once in open syllables **in metrical poetry** can be macronized. For those dichrona that do not, we either rely on Ancient grammarians and the induction of modern historical linguists or pure speculation. I will refer to dichronic vowel lengths for which there is no evidence as **unknown**.
 - By *true dichronon*, I mean a dichronon not disambiguated by any of the following four **accentuation rules** for Attic Greek:
@@ -25,8 +25,10 @@ _Notes_:
    - a **sentence** (or passage in general) is considered macronized, when every word in it has been macronized.
 - In verse,
    - a word is considered macronized, when every **non-final** open syllable in it has been macronized ([syllaba] *brevis in* [positio] *longo*).
-   - the level of the **line** introduces metrical constraints on dichrona, while the metre itself is recursively constrained by the dichrona in a hermeneutic circle.
-      - For example, an open-syllable dichronon in the princeps of the first hexameter foot will always be long.
+   - a **line** is considered macronized, when every word in it has been macronized.
+   - the level of the **line** introduces metrical constraints on dichrona, while the metre itself is recursively constrained by the dichrona.
+      - Exampe of metrical constraints on vowel length: an open-syllable dichronon in the princeps of the first hexameter foot will always be long.
+      - Example of vowel-length constraints on metre: 
 
 - Convention: the vowel lengths of **true dichrona in non-final open syllables** are never considered implied; all other vowel lengths are considered implied.
 - The TLG is considered macronized when every sentence in it has been macronized.
