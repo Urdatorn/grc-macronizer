@@ -1,9 +1,6 @@
 # Macronizing the TLG 
 
 ## Method
-
-## Work flow for the TLG macronizer:
-
 _Notes and definitions_:
 - A dichronon (pl. dichrona) is an α, ι or υ (alpha, iota or ypsilon) **without circumflex** and **outside of diphthongs**. Alpha with iota subscriptum (ᾳ) is a s.c. long diphthong, and hence not a dichronon.
 - The theoretical goal "in the limit" is that all **open syllables** be macronized: in practice, we can only say with full certainty that all dichrona appearing at least once in open syllables **in metrical poetry** can be macronized. For those dichrona that do not, we either rely on Ancient grammarians and the induction of modern historical linguists or pure speculation. I will refer to dichronic vowel lengths for which there is no evidence as **unknown**.
@@ -27,6 +24,7 @@ _Notes and definitions_:
 
 - **NB1:** The "paroxytone + short ultima" rule for the penultima *depends on endings having been macronized* since a huge amount of words end on dichrona. Likewise, the "paroxytone + long penultima" for the ultima *depends on penultima having been macronized*, to the extent penultima are dichronic.
 
+## Work flow for the TLG macronizer:
 _Specifics of the flow chart_
 - Macronizing does not overwrite earlier macrons, i.e. the results of "upstream" macronizing, unless otherwise stated (which does occur).
 
