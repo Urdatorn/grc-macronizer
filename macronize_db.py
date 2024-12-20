@@ -11,12 +11,6 @@ def macronize(word):
     If there is exactly one match, returns the macronized key.
     If there is more than one match, returns a list of macronized keys.
     If no matches are found, returns None.
-
-    Args:
-        word (str): The Ancient Greek word to macronize.
-
-    Returns:
-        str | list | None: The macronized word(s) or None if no match is found.
     """
     start_time = time.perf_counter()
     
@@ -53,10 +47,49 @@ def macronize(word):
     else:
         return None  # No match found
 
-### TEST ###
-test_words = ['ἀσφαλής']
-for word in test_words:
-    result = macronize(word)
-    print(f"{word} -> {result}")
 
-sentence = 'Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δύο, πρεσβύτερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος· ἐπεὶ δὲ ἠσθένει Δαρεῖος καὶ ὑπώπτευε τελευτὴν τοῦ βίου, ἐβούλετο τὼ παῖδε ἀμφοτέρω παρεῖναι. ὁ μὲν οὖν πρεσβύτερος παρὼν ἐτύγχανε· Κῦρον δὲ μεταπέμπεται ἀπὸ τῆς ἀρχῆς ἧς αὐτὸν σατράπην ἐποίησε, καὶ στρατηγὸν δὲ αὐτὸν ἀπέδειξε πάντων ὅσοι ἐς Καστωλοῦ πεδίον ἁθροίζονται. ἀναβαίνει οὖν ὁ Κῦρος λαβὼν Τισσαφέρνην ὡς φίλον, καὶ τῶν Ἑλλήνων ἔχων ὁπλίτας ἀνέβη τριακοσίους, ἄρχοντα δὲ αὐτῶν Ξενίαν Παρράσιον.'
+def macronize_batch(words):
+    """
+    Takes a list of words and returns a dictionary mapping each original word to 
+    its macronized form(s) or None, by loading all words once from the database.
+    """
+    start_time = time.perf_counter()
+    
+    # Normalize and strip macrons from input words once for efficiency
+    normalized_input_words = [normalize_word(no_macrons(w)) for w in words]
+
+    # Connect to the SQLite database and fetch all words once
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT word FROM macrons")
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Build a lookup dictionary:
+    # key = normalized macron-stripped word, value = list of macronized candidates
+    normalized_map = {}
+    for row in rows:
+        db_word = row[0]
+        nw = normalize_word(no_macrons(db_word))
+        normalized_map.setdefault(nw, []).append(db_word)
+
+    # For each input word, fetch matches from the lookup map
+    results = {}
+    for original_word, nw in zip(words, normalized_input_words):
+        matches = normalized_map.get(nw, [])
+        if len(matches) == 1:
+            results[original_word] = matches[0]
+        elif len(matches) > 1:
+            results[original_word] = matches
+        else:
+            results[original_word] = None
+
+    end_time = time.perf_counter()
+    print(f"Elapsed time: {end_time - start_time:.2f} seconds")
+    return results
+
+### TEST ###
+test_words = ['ἀσφαλής', 'λύω', 'ὕδασιν']
+batch_results = macronize_batch(test_words)
+for w in test_words:
+    print(f"{w} -> {batch_results[w]}")
