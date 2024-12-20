@@ -1,12 +1,6 @@
 # Macronizing the TLG 
 
-## Conventions/Priorities
-1) Successful macronization of a corpus is gauged solely on the basis of:
-   1)  open syllables and
-   2)  excludes line-final syllables (syllaba brevis in positio longo)
-   
-When all *non-final dichrona in open syllables* are disambiguated, the project is complete. 
-
+## Method
 
 ## Work flow for the TLG macronizer:
 
@@ -28,11 +22,8 @@ _Notes and definitions_:
    - a **line** is considered macronized, when every word in it has been macronized.
    - the level of the **line** introduces metrical constraints on dichrona, while the metre itself is recursively constrained by the dichrona.
       - Exampe of metrical constraints on vowel length: an open-syllable dichronon in the princeps of the first hexameter foot will always be long.
-      - Example of vowel-length constraints on metre: 
-
 - Convention: the vowel lengths of **true dichrona in non-final open syllables** are never considered implied; all other vowel lengths are considered implied.
-- The TLG is considered macronized when every sentence in it has been macronized.
-- 
+- And, finally, the TLG is considered macronized when every sentence and line in it has been macronized.
 
 - **NB1:** The "paroxytone + short ultima" rule for the penultima *depends on endings having been macronized* since a huge amount of words end on dichrona. Likewise, the "paroxytone + long penultima" for the ultima *depends on penultima having been macronized*, to the extent penultima are dichronic.
 
