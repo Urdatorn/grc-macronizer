@@ -12,8 +12,6 @@ def macronize(words):
     to its macronized form(s). If no matches are found, it returns the original
     input word.
     """
-    start_time = time.perf_counter()
-
     # Normalize and strip macrons from input words once for efficiency
     normalized_input_words = [normalize_word(no_macrons(w)) for w in words]
 
@@ -44,8 +42,6 @@ def macronize(words):
             # If no matches, return the original input word
             results[original_word] = original_word
 
-    end_time = time.perf_counter()
-    print(f"Elapsed time: {end_time - start_time:.2f} seconds")
     return results
 
 def macronize_text(text):
@@ -55,6 +51,8 @@ def macronize_text(text):
     macronize the words only, and then reassemble everything with punctuation
     and whitespace in their original places.
     """
+    start_time = time.perf_counter()
+
     # Check if there's whitespace in the text
     if not re.search(r'\s', text):
         # No whitespace: treat as a single word
@@ -80,6 +78,9 @@ def macronize_text(text):
             if re.match(r'^\w+$', token):
                 original_word = next(word_iter)
                 tokens[i] = macronized_map[original_word]
+
+        end_time = time.perf_counter()
+        print(f"Elapsed time: {end_time - start_time:.2f} seconds")
 
         # Join tokens back together to preserve punctuation and whitespace
         return "".join(tokens)
