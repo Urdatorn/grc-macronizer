@@ -18,7 +18,7 @@ _Notes and definitions_:
    - a word is considered macronized, when every **non-final** open syllable in it has been macronized ([syllaba] *brevis in* [positio] *longo*).
    - a **line** is considered macronized, when every word in it has been macronized.
    - the level of the **line** introduces metrical constraints on dichrona, while the metre itself is recursively constrained by the dichrona.
-      - Exampe of metrical constraints on vowel length: an open-syllable dichronon in the princeps of the first hexameter foot will always be long.
+      - Example of metrical constraints on vowel length: an open-syllable dichronon in the princeps of the first hexameter foot will always be long.
 - Convention: the vowel lengths of **true dichrona in non-final open syllables** are never considered implied; all other vowel lengths are considered implied.
 - And, finally, the TLG is considered macronized when every sentence and line in it has been macronized.
 
@@ -78,4 +78,4 @@ Wiktionary works under the following conventions:
 
 Cf. https://en.wiktionary.org/wiki/Wiktionary:About_Ancient_Greek (accessed 4 dec. 2024)
 
-- Specific problem 1: Marking of superheavies is in general irreducibly conjectural: wiktionaries decisions are often scientifically unfounded.
+- Specific problem 1: Marking of superheavies is in general irreducibly conjectural: Wiktionary's decisions are often scientifically unfounded.
