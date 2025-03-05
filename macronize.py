@@ -50,8 +50,9 @@ def macronize(words, ifeellucky=True):
                 results[original_word] = matches
         else:
             # If no matches, try replacing grave with acute if the word ends with a grave
-            if original_word and original_word[-1] in grave_to_acute:
+            if original_word and any(char in grave_to_acute for char in original_word):
                 modified_word = replace_grave_with_acute(original_word)
+                print(f"Trying again with grave replaced by acute: {original_word} -> {modified_word}")
                 nw_modified = normalize_word(no_macrons(modified_word))
                 matches = normalized_map.get(nw_modified, [])
                 if matches:
