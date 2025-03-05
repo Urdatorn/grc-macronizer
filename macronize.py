@@ -6,7 +6,7 @@ from grc_utils import no_macrons, normalize_word
 # Database file path
 DB_FILE = '/Users/albin/git/grc-wiktionary/grc_macrons.db'
 
-def macronize(words):
+def macronize(words, ifeellucky=True):
     """
     Takes a list of words and returns a dictionary mapping each original word
     to its macronized form(s). If no matches are found, it returns the original
@@ -37,7 +37,10 @@ def macronize(words):
         if len(matches) == 1:
             results[original_word] = matches[0]
         elif len(matches) > 1:
-            results[original_word] = matches
+            if ifeellucky:
+                results[original_word] = matches[0] # trust that the first match will be good enough
+            else:
+                results[original_word] = matches
         else:
             # If no matches, return the original input word
             results[original_word] = original_word
@@ -84,13 +87,4 @@ def macronize_text(text):
 
         # Join tokens back together to preserve punctuation and whitespace
         return "".join(tokens)
-
-### TEST ###
-test_words = ['ἀσφαλής', 'λύω', 'ὕδασιν', 'ὕδωρ']
-batch_results = macronize(test_words)
-for w in test_words:
-    print(f"{w} -> {batch_results[w]}")
-
-sentence = 'Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δύο, πρεσβύτερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος· ἐπεὶ δὲ ἠσθένει Δαρεῖος καὶ ὑπώπτευε τελευτὴν τοῦ βίου, ἐβούλετο τὼ παῖδε ἀμφοτέρω παρεῖναι. ὁ μὲν οὖν πρεσβύτερος παρὼν ἐτύγχανε· Κῦρον δὲ μεταπέμπεται ἀπὸ τῆς ἀρχῆς ἧς αὐτὸν σατράπην ἐποίησε, καὶ στρατηγὸν δὲ αὐτὸν ἀπέδειξε πάντων ὅσοι ἐς Καστωλοῦ πεδίον ἁθροίζονται. ἀναβαίνει οὖν ὁ Κῦρος λαβὼν Τισσαφέρνην ὡς φίλον, καὶ τῶν Ἑλλήνων ἔχων ὁπλίτας ἀνέβη τριακοσίους, ἄρχοντα δὲ αὐτῶν Ξενίαν Παρράσιον.'
-
-print(macronize_text(sentence))
+    
