@@ -1,4 +1,13 @@
-# Macronizing the TLG 
+# Macronizing the TLG
+
+##
+
+Additions to the "stupid" db lookups
+- simple logic to map barytone words to acute
+
+NB: For Logion, the end product will be an **"aggressive" macronizer**, i.e. it will attempt to macronize all true dichrona in open syllables. For human users, a subtler version that presupposes knowledge of the constrictions on Attic vowel lenghts (the four accent rules) is more didactically useful.
+
+Hence, there should be a final step of aggression, i.e. a four-accent-rule macronizer. 
 
 ## Method
 _Notes and definitions_:
