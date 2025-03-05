@@ -1,3 +1,7 @@
+'''
+TODO: only wiktionary as of now. add database of hypotactic, aristophanes and manual additions
+'''
+
 import re
 import sqlite3
 import time
