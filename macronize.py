@@ -5,6 +5,8 @@ TODO: only wiktionary as of now. add database of hypotactic, aristophanes and ma
 import re
 import sqlite3
 import time
+
+from barytone import replace_grave_with_acute, grave_to_acute
 from grc_utils import no_macrons, normalize_word
 
 # Database file path
@@ -14,7 +16,8 @@ def macronize(words, ifeellucky=True):
     """
     Takes a list of words and returns a dictionary mapping each original word
     to its macronized form(s). If no matches are found, it returns the original
-    input word.
+    input word. If no match is found and the input word ends with a grave accent,
+    it tries again with the grave replaced by an acute.
     """
     # Normalize and strip macrons from input words once for efficiency
     normalized_input_words = [normalize_word(no_macrons(w)) for w in words]
@@ -46,10 +49,19 @@ def macronize(words, ifeellucky=True):
             else:
                 results[original_word] = matches
         else:
-            # If no matches, return the original input word
+            # If no matches, try replacing grave with acute if the word ends with a grave
+            if original_word and original_word[-1] in grave_to_acute:
+                modified_word = replace_grave_with_acute(original_word)
+                nw_modified = normalize_word(no_macrons(modified_word))
+                matches = normalized_map.get(nw_modified, [])
+                if matches:
+                    results[original_word] = matches[0] if ifeellucky else matches
+                    continue
+            # If still no matches, return the original input word
             results[original_word] = original_word
 
     return results
+
 
 def macronize_text(text):
     """

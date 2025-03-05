@@ -1,25 +1,49 @@
-'''
-Barytones inherit their macra from oxytones
+from grc_utils import oxia_to_tonos
 
-'''
-import re
-from grc_utils import acutes, graves, only_bases, syllabifier, ultima
+grave_to_acute = {
+    'ὰ': 'ά',
+    'ὲ': 'έ',
+    'ὴ': 'ή',
+    'ὶ': 'ί',
+    'ὸ': 'ό',
+    'ὺ': 'ύ',
+    'ὼ': 'ώ',
+    'ῒ': 'ΐ',
+    'ῢ': 'ΰ',
+    'ἂ': 'ἄ',
+    'ἃ': 'ἅ',
+    'ἒ': 'ἔ',
+    'ἓ': 'ἕ',
+    'ἢ': 'ἤ',
+    'ἣ': 'ἥ',
+    'ἲ': 'ἴ',
+    'ἳ': 'ἵ',
+    'ὂ': 'ὄ',
+    'ὃ': 'ὅ',
+    'ὒ': 'ὔ',
+    'ὓ': 'ὕ',
+    'ὢ': 'ὤ',
+    'ὣ': 'ὥ',
+    'ᾂ': 'ᾄ',
+    'ᾃ': 'ᾅ',
+    'ᾲ': 'ᾴ',
+    'ᾒ': 'ᾔ',
+    'ᾓ': 'ᾕ',
+    'ῂ': 'ῄ',
+    'ᾢ': 'ᾤ',
+    'ᾣ': 'ᾥ',
+    'ῲ': 'ῴ'
+}
 
 
-def barytone(token):
-    if re.search(graves, token):
-        return True
-    return False
-
-
-def replace_grave_with_acute(token):
+def replace_grave_with_acute(string):
     '''
-    >>> replace_grave_with_acute('ἱεὶς')
-    >>> ἱείς
+    Replaces grave accents with acute accents in a given string.
     '''
-    def replace(match):
-        char = match.group(0)
-        pos = graves.index(char)
-        return acutes[pos]
-    
-    return re.sub(graves, replace, token)
+    return ''.join(grave_to_acute.get(char, char) for char in string)
+
+
+if __name__ == '__main__':
+    input_graves = 'ὰὲὶὸὺὴὼ'
+    output_acutes = replace_grave_with_acute(input_graves)
+    assert output_acutes == 'άέίόύήώ'
