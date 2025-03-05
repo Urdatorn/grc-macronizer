@@ -2,6 +2,8 @@
 
 ##
 
+test
+
 Additions to the "stupid" db lookups
 - simple logic to map barytone words to acute
 
