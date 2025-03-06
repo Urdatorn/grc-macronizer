@@ -1,5 +1,8 @@
 import sqlite3
 
+SHORT = '̆'
+LONG = '̄'
+
 def hypotactic(word, db_path='db/hypotactic.db'):
     try:
         conn = sqlite3.connect(db_path)

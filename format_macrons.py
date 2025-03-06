@@ -1,26 +1,9 @@
-'''
-Takes a list of polytonic Greek tokens such as 
-
-νεᾱνῐ́ᾱς
-νεᾱνῐ́ᾳ
-νεᾱνῐείᾱ
-νεᾱνῐεύομαι
-
-and separates the tokens from the vowel-lengths, turning it into a two-column TSV, such as
-
-νεανίας	_3^5_6
-'''
-import re
 import unicodedata
 
-from greek_accentuation.characters import length
-from grc_utils import macrons_map, base_alphabet, base, normalize_word
+from grc_utils import macrons_map
 
 SHORT = '̆'
 LONG = '̄'
-
-# Define length_count as a global dictionary
-length_count = {'long': 0, 'short': 0}
 
 
 def strip_length_string(string):
@@ -34,9 +17,15 @@ def strip_length_string(string):
     return string
 
 
-def macron_unicode_to_markup(word):
+def macron_unicode_to_markup(text):
+    '''
+    >>> macron_unicode_to_markup('νεᾱνῐ́ᾱς')
+    >>> νεα_νί^α_ς
+
+    (I grappled with a unicode bug for a LONG time! The solution came from Grok 3)
+    '''
     # Step 1: Decompose into base characters and combining marks
-    decomposed = unicodedata.normalize('NFD', word)
+    decomposed = unicodedata.normalize('NFD', text)
     
     result = ''
     i = 0
@@ -66,21 +55,86 @@ def macron_unicode_to_markup(word):
             result += char
             i += 1
     
+    # Most Greek punctuation decomposes to Latin punctuation, so we need to revert that
+    # middle dot (U+00B7) -> ano teleia (U+0387)
+    # semicolon (U+003B) -> Greek question mark (U+037E)
+    result = result.replace('\u00b7', '\u0387')
+    result = result.replace('\u003b', '\u037e')
     return result
 
 
-def batch_macron_unicode_to_markup(text):
-    def get_words(text):
-        return re.findall(r'\w+', text)
+def macron_markup_to_unicode(text):
+    '''
+    >>> assert macron_markup_to_unicode('νεα_νί^α_ς') == 'νεᾱνῐ́ᾱς'
+    '''
+    result = ''
+    i = 0
+    while i < len(text):
+        char = text[i]
+        if unicodedata.category(char).startswith('L'):
+            # Collect diacritics
+            diacritics = ''
+            i += 1
+            while i < len(text) and unicodedata.category(text[i]).startswith('M'):
+                diacritics += text[i]
+                i += 1
+            # Check for length marker
+            length_combining = ''
+            if i < len(text) and text[i] in '_^':
+                if text[i] == '_':
+                    length_combining = '̄'  # Macron
+                elif text[i] == '^':
+                    length_combining = '̆'  # Breve
+                i += 1
+            # Construct sequence: base + length_combining + diacritics
+            sequence = char + length_combining + diacritics
+            # Normalize to NFC
+            composed = unicodedata.normalize('NFC', sequence)
+            result += composed
+        else:
+            # Non-letter, append as is
+            result += char
+            i += 1
     
-    for word in get_words(text):
-        yield macron_unicode_to_markup(word)
+    # Most Greek punctuation decomposes to Latin punctuation, so we need to revert that
+    # middle dot (U+00B7) -> ano teleia (U+0387)
+    # semicolon (U+003B) -> Greek question mark (U+037E)
+    result = result.replace('\u00b7', '\u0387')
+    result = result.replace('\u003b', '\u037e')
+    return result
 
 
-print(macron_unicode_to_markup('νεᾱνῐ́ᾱς'))
+assert macron_unicode_to_markup('νεᾱνῐ́ᾱς') == 'νεα_νί^α_ς'
+assert macron_markup_to_unicode('νεα_νί^α_ς') == 'νεᾱνῐ́ᾱς'
+
+anabasis_unicode_test = '''Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δῠ́ο, πρεσβῠ́τερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος· ἐπεὶ δὲ ἠσθένει Δαρεῖος καὶ ῠ̔πώπτευε τελευτὴν τοῦ βῐ́ου, ἐβούλετο τὼ παῖδε ᾰ̓μφοτέρω πᾰρεῖναι. ὁ μὲν οὖν πρεσβῠ́τερος πᾰρὼν ἐτύγχᾰνε· Κῦρον δὲ μετᾰπέμπεται ἀπὸ τῆς ἀρχῆς ἧς αὐτὸν σατράπην ἐποίησε, καὶ στρατηγὸν δὲ αὐτὸν ἀπέδειξε πᾰ́ντων ὅσοι ἐς Καστωλοῦ πεδίον ἁθροίζονται. ᾰ̓νᾰβαίνει οὖν ὁ Κῦρος λᾰβὼν Τισσαφέρνην ὡς φῐ́λον, καὶ τῶν Ἑλλήνων ἔχων ὁπλῑ́τᾱς ᾰ̓νέβη τρῐᾱκοσῐ́ους, ᾰ̓́ρχοντᾰ δὲ αὐτῶν Ξενίαν Παρράσιον. ἐπεὶ δὲ ἐτελεύτησε Δαρεῖος καὶ κᾰτέστη εἰς τὴν βᾰσῐλείᾱν Ἀρταξέρξης, Τισσαφέρνης διαβάλλει τὸν Κῦρον πρὸς τὸν ᾰ̓δελφὸν ὡς ἐπῐβουλεύοι αὐτῷ. ὁ δὲ πείθεται καὶ σῠλλᾰμβᾰ́νει Κῦρον ὡς ἀποκτενῶν·'''
+anabasis_markup_test = macron_unicode_to_markup(anabasis_unicode_test)
+assert macron_markup_to_unicode(anabasis_markup_test) == anabasis_unicode_test
 
 if __name__ == '__main__':
     from anabasis import anabasis
-    from anabasis_macronized import anabasis_macronized
+    from anabasis_unicode import anabasis_unicode
+    #from anabasis_markup import anabasis_markup
 
-    #assert anabasis == 
+    # Test the conversion functions
+    # markup = macron_unicode_to_markup(anabasis_unicode)
+    # reconstructed = macron_markup_to_unicode(markup)
+
+    # for i, (orig, recon) in enumerate(zip(anabasis_unicode, reconstructed)):
+    #     if orig != recon:
+    #         print(f"Discrepancy at position {i}:")
+    #         print(f"Original: '{orig}' (U+{ord(orig):04X})")
+    #         print(f"Reconstructed: '{recon}' (U+{ord(recon):04X})")
+    #         # Show context
+    #         start = max(0, i - 5)
+    #         end = min(len(anabasis_unicode), i + 5)
+    #         print(f"Original context: {anabasis_unicode[start:end]}")
+    #         print(f"Reconstructed context: {reconstructed[start:end]}")
+    #         break
+
+    # Save the markup version of Anabasis
+    anabasis_markup = macron_unicode_to_markup(anabasis_unicode)    
+    with open('anabasis_markup.py', 'w') as f:
+        f.write(f'anabasis_markup = """{anabasis_markup}"""')
+
+    assert anabasis_unicode == macron_markup_to_unicode(anabasis_markup)
