@@ -165,12 +165,6 @@ def macron_integrate_markup(word, macrons):
 
     return normalize_word(result)
 
-# Test the function
-if __name__ == "__main__":
-    test_word = 'νεανίας'
-    test_macrons = '_3,^5,_6'
-    result = macron_integrate_markup(test_word, test_macrons)
-    print(f"Input: {test_word}, {test_macrons}")
-    print(f"Output: {result}")
-    assert result == 'νεα_νί^α_ς'
+
+
 

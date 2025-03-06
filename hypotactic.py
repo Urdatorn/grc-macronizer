@@ -1,5 +1,7 @@
 import sqlite3
 
+from format_macrons import macron_integrate_markup
+
 def hypotactic(word, hypotactic_db_path='db/hypotactic.db'):
     try:
         conn = sqlite3.connect(hypotactic_db_path)
@@ -12,7 +14,7 @@ def hypotactic(word, hypotactic_db_path='db/hypotactic.db'):
         conn.close()
         
         if result:
-            return result[0]  # Return first column of the result (macrons)
+            return macron_integrate_markup(word, result[0])  # Return first column of the result (macrons)
         return word
     
     except sqlite3.Error as e:
