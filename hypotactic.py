@@ -1,11 +1,8 @@
 import sqlite3
 
-SHORT = '̆'
-LONG = '̄'
-
-def hypotactic(word, db_path='db/hypotactic.db'):
+def hypotactic(word, hypotactic_db_path='db/hypotactic.db'):
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(hypotactic_db_path)
         cursor = conn.cursor()
         
         cursor.execute("SELECT macrons FROM annotated_tokens WHERE token = ?", (word,)) # important to include table name
@@ -24,8 +21,4 @@ def hypotactic(word, db_path='db/hypotactic.db'):
 
 # Example usage:
 print(hypotactic("ἀγαθῆς"))  # Uses default db_path='hypotactic.db'
-# print(hypotactic("test", db_path='/path/to/your/hypotactic.db'))  # Specify custom path
 
-from greek_accentuation.characters import add_diacritic
-
-add_diacritic('ι', SHORT)

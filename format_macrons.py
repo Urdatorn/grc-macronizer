@@ -1,6 +1,10 @@
+'''
+Tread carefully. This is a minefield of Unicode normalization and combining characters.
+'''
+
 import unicodedata
 
-from grc_utils import macrons_map
+from grc_utils import macrons_map, normalize_word
 
 SHORT = '̆'
 LONG = '̄'
@@ -104,38 +108,69 @@ def macron_markup_to_unicode(text):
     return result
 
 
-assert macron_unicode_to_markup('νεᾱνῐ́ᾱς') == 'νεα_νί^α_ς'
-assert macron_markup_to_unicode('νεα_νί^α_ς') == 'νεᾱνῐ́ᾱς'
-
 anabasis_unicode_test = '''Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δῠ́ο, πρεσβῠ́τερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος· ἐπεὶ δὲ ἠσθένει Δαρεῖος καὶ ῠ̔πώπτευε τελευτὴν τοῦ βῐ́ου, ἐβούλετο τὼ παῖδε ᾰ̓μφοτέρω πᾰρεῖναι. ὁ μὲν οὖν πρεσβῠ́τερος πᾰρὼν ἐτύγχᾰνε· Κῦρον δὲ μετᾰπέμπεται ἀπὸ τῆς ἀρχῆς ἧς αὐτὸν σατράπην ἐποίησε, καὶ στρατηγὸν δὲ αὐτὸν ἀπέδειξε πᾰ́ντων ὅσοι ἐς Καστωλοῦ πεδίον ἁθροίζονται. ᾰ̓νᾰβαίνει οὖν ὁ Κῦρος λᾰβὼν Τισσαφέρνην ὡς φῐ́λον, καὶ τῶν Ἑλλήνων ἔχων ὁπλῑ́τᾱς ᾰ̓νέβη τρῐᾱκοσῐ́ους, ᾰ̓́ρχοντᾰ δὲ αὐτῶν Ξενίαν Παρράσιον. ἐπεὶ δὲ ἐτελεύτησε Δαρεῖος καὶ κᾰτέστη εἰς τὴν βᾰσῐλείᾱν Ἀρταξέρξης, Τισσαφέρνης διαβάλλει τὸν Κῦρον πρὸς τὸν ᾰ̓δελφὸν ὡς ἐπῐβουλεύοι αὐτῷ. ὁ δὲ πείθεται καὶ σῠλλᾰμβᾰ́νει Κῦρον ὡς ἀποκτενῶν·'''
 anabasis_markup_test = macron_unicode_to_markup(anabasis_unicode_test)
 assert macron_markup_to_unicode(anabasis_markup_test) == anabasis_unicode_test
 
-if __name__ == '__main__':
-    from anabasis import anabasis
-    from anabasis_unicode import anabasis_unicode
-    #from anabasis_markup import anabasis_markup
 
-    # Test the conversion functions
-    # markup = macron_unicode_to_markup(anabasis_unicode)
-    # reconstructed = macron_markup_to_unicode(markup)
-
-    # for i, (orig, recon) in enumerate(zip(anabasis_unicode, reconstructed)):
-    #     if orig != recon:
-    #         print(f"Discrepancy at position {i}:")
-    #         print(f"Original: '{orig}' (U+{ord(orig):04X})")
-    #         print(f"Reconstructed: '{recon}' (U+{ord(recon):04X})")
-    #         # Show context
-    #         start = max(0, i - 5)
-    #         end = min(len(anabasis_unicode), i + 5)
-    #         print(f"Original context: {anabasis_unicode[start:end]}")
-    #         print(f"Reconstructed context: {reconstructed[start:end]}")
-    #         break
+def macron_integrate_markup(word, macrons):
+    '''    
+    >>> macron_integrate_markup('νεανίας', '_3,^5,_6')
+    'νεα_νί^α_ς'
+    '''
+    # Parse the macrons string into a list of (marker, position) tuples
+    if not macrons:
+        return word
     
-    # Save the markup version of Anabasis
-    anabasis_markup = macron_unicode_to_markup(anabasis_unicode)    
-    with open('anabasis_markup.py', 'w') as f:
-        f.write(f'anabasis_markup = """{anabasis_markup}"""')
+    markup_list = []
+    for mark in macrons.split(','):
+        mark = mark.strip()
+        if mark:
+            marker = mark[0]  # _ or ^
+            position = int(mark[1:])  # Convert position to integer
+            markup_list.append((marker, position))
+    
+    # Sort markup by position (highest first) to avoid shifting issues
+    markup_list.sort(key=lambda x: x[1], reverse=True)
+    
+    # Decompose the word into NFD to handle combining characters
+    decomposed = unicodedata.normalize('NFD', word)
+    
+    # Build the result by inserting markup at specified positions
+    result = ''
+    char_pos = 0  # Tracks position of base characters (letters)
+    i = 0  # Index in decomposed string
+    
+    while i < len(decomposed):
+        char = decomposed[i]
+        if unicodedata.category(char).startswith('L'):
+            char_pos += 1  # Increment for each base letter
+            # Collect diacritics for this character
+            diacritics = ''
+            i += 1
+            while i < len(decomposed) and unicodedata.category(decomposed[i]).startswith('M'):
+                diacritics += decomposed[i]
+                i += 1
+            # Check if this position has a length marker
+            length_marker = ''
+            for marker, pos in markup_list:
+                if pos == char_pos:
+                    length_marker = marker
+                    break
+            result += char + diacritics + length_marker
+        else:
+            # Non-letter character (e.g., punctuation)
+            result += char
+            i += 1
 
-    from anabasis_unicode import anabasis_unicode
-    assert anabasis_unicode == macron_markup_to_unicode(anabasis_markup)
+    return normalize_word(result)
+
+# Test the function
+if __name__ == "__main__":
+    test_word = 'νεανίας'
+    test_macrons = '_3,^5,_6'
+    result = macron_integrate_markup(test_word, test_macrons)
+    print(f"Input: {test_word}, {test_macrons}")
+    print(f"Output: {result}")
+    assert result == 'νεα_νί^α_ς'
+
