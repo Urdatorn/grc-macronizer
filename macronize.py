@@ -6,7 +6,7 @@ import re
 import sqlite3
 import time
 
-from barytone import replace_grave_with_acute, grave_to_acute
+from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
 from grc_utils import no_macrons, normalize_word
 
 # Database file path
@@ -52,11 +52,11 @@ def macronize(words, ifeellucky=True):
             # If no matches, try replacing grave with acute if the word ends with a grave
             if original_word and any(char in grave_to_acute for char in original_word):
                 modified_word = replace_grave_with_acute(original_word)
-                print(f"Trying again with grave replaced by acute: {original_word} -> {modified_word}")
+                #print(f"Trying again with grave replaced by acute: {original_word} -> {modified_word}")
                 nw_modified = normalize_word(no_macrons(modified_word))
                 matches = normalized_map.get(nw_modified, [])
                 if matches:
-                    results[original_word] = matches[0] if ifeellucky else matches
+                    results[original_word] = replace_acute_with_grave(matches[0]) if ifeellucky else [replace_acute_with_grave(word) for word in matches]
                     continue
             # If still no matches, return the original input word
             results[original_word] = original_word

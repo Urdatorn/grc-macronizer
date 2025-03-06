@@ -1,28 +1,28 @@
-import xml.etree.ElementTree as ET
+import sqlite3
 
-def hypotactic_syllables(w):
-    """
-    Extracts syllables from an XML <w> element.
+def hypotactic(word, db_path='db/hypotactic.db'):
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT macrons FROM annotated_tokens WHERE token = ?", (word,)) # important to include table name
+        
+        result = cursor.fetchone()
+        
+        conn.close()
+        
+        if result:
+            return result[0]  # Return first column of the result (macrons)
+        return word
+    
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return word
 
-    Args:
-        w (xml.etree.ElementTree.Element): An XML <w> element containing <syll> elements.
+# Example usage:
+print(hypotactic("ἀγαθῆς"))  # Uses default db_path='hypotactic.db'
+# print(hypotactic("test", db_path='/path/to/your/hypotactic.db'))  # Specify custom path
 
-    Returns:
-        list: A list of syllable strings extracted from the <w> element.
-    """
-    return [syll.text for syll in w.findall("syll") if syll.text]
+from greek_accentuation.characters import add_diacritic
 
-import xml.etree.ElementTree as ET
-
-def hypotactic_work(w):
-    """
-    Extracts the full word from an XML <w> element by concatenating its <syll> elements.
-
-    Args:
-        w (xml.etree.ElementTree.Element): An XML <w> element containing <syll> elements.
-
-    Returns:
-        str: The full word formed by concatenating all syllables.
-    """
-    return "".join(syll.text for syll in w.findall("syll") if syll.text)
-
+add_diacritic('ι', SHORT)
