@@ -131,10 +131,11 @@ if __name__ == '__main__':
     #         print(f"Original context: {anabasis_unicode[start:end]}")
     #         print(f"Reconstructed context: {reconstructed[start:end]}")
     #         break
-
+    
     # Save the markup version of Anabasis
     anabasis_markup = macron_unicode_to_markup(anabasis_unicode)    
     with open('anabasis_markup.py', 'w') as f:
         f.write(f'anabasis_markup = """{anabasis_markup}"""')
 
+    from anabasis_unicode import anabasis_unicode
     assert anabasis_unicode == macron_markup_to_unicode(anabasis_markup)
