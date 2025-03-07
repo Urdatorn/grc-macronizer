@@ -21,6 +21,4 @@ def hypotactic(word, hypotactic_db_path='db/hypotactic.db'):
         print(f"Database error: {e}")
         return word
 
-# Example usage:
-print(hypotactic("ἀγαθῆς"))  # Uses default db_path='hypotactic.db'
 

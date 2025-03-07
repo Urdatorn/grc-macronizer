@@ -1,14 +1,24 @@
+from concurrent.futures import ProcessPoolExecutor
 import re
 import sqlite3
 import time
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
 from format_macrons import macron_unicode_to_markup
-from grc_utils import has_ambiguous_dichrona_in_open_syllables, no_macrons, normalize_word
+from grc_utils import count_ambiguous_dichrona_in_open_syllables, has_ambiguous_dichrona_in_open_syllables, no_macrons, normalize_word, vowel
+from hypotactic import hypotactic
 from proper_names import proper_names
 
+def check_word(word):
+    return not has_ambiguous_dichrona_in_open_syllables(word)
+
+def get_words(text):
+            text = normalize_word(text) # combining diacritics will cause splits without this
+            words = re.findall(r'[\w^_]+', text) # remember that we are now acting on integrated markup with carets and underscores
+            return [word for word in words if any(vowel(char) for char in word)] # extra precaution: all grc words have vowels
+
 class Macronizer:
-    """A class to handle macronization of Greek text using a SQLite database."""
+    """A class to handle macronization of Greek text using databases."""
     
     def __init__(self, 
                  macronize_everything=True,
@@ -71,7 +81,7 @@ class Macronizer:
                 if self.ifeellucky:
                     results[original_word] = matches[0]
                 else:
-                    results[original_word] = matches
+                    results[original_word] = matches # work in progress; this should pipe to a POS disambiguator
             else:
                 # Try replacing grave with acute if no matches
                 if original_word and any(char in grave_to_acute for char in original_word):
@@ -81,10 +91,15 @@ class Macronizer:
                     if matches:
                         results[original_word] = (replace_acute_with_grave(matches[0]) 
                                                if self.ifeellucky 
-                                               else [replace_acute_with_grave(word) for word in matches])
+                                               else [replace_acute_with_grave(word) for word in matches]) # work in progress; this should pipe to a POS disambiguator
                         continue
+                # Try hypotactic db if grave-acute doesn't help
+                elif hypotactic(original_word) != original_word:
+                    results[original_word] = hypotactic(original_word)
+                    continue
                 # If still no matches, return original word
-                results[original_word] = original_word
+                else:
+                    results[original_word] = original_word
 
         if self.unicode:
             return results
@@ -121,17 +136,14 @@ class Macronizer:
         for i, token in enumerate(tokens):
             if re.match(r'^\w+$', token):
                 original_word = next(word_iter)
-                tokens[i] = macronized_map[original_word]
+                tokens[i] = macronized_map.get(original_word, original_word)
 
         end_time = time.perf_counter()
         print(f"Elapsed time: {end_time - start_time:.2f} seconds")
 
         return "".join(tokens)
     
-    def macronization_ratio_words(self, text, count_proper_names=True):
-        def get_words(text):
-            return re.findall(r'\w+', text)
-
+    def macronization_ratio(self, text, count_proper_names=True):
         def remove_proper_names(text):
             # Build a regex pattern that matches whole words from the set
             pattern = r'\b(?:' + '|'.join(re.escape(name) for name in proper_names) + r')\b'
@@ -141,34 +153,18 @@ class Macronizer:
             cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
 
             return cleaned_text
-
+        
+        text = normalize_word(text)
         if not count_proper_names:
             text = remove_proper_names(text)
 
-        words = get_words(text)
+        ambiguous_dichrona_in_open_syllables_before = count_ambiguous_dichrona_in_open_syllables(text)
+        ambiguous_dichrona_in_open_syllables_after = count_ambiguous_dichrona_in_open_syllables(self.macronize_text(text))
+        difference = ambiguous_dichrona_in_open_syllables_before - ambiguous_dichrona_in_open_syllables_after
 
-        fully_disambiguated = 0
-        for word in words:
-            if has_ambiguous_dichrona_in_open_syllables(word):
-                continue
-            fully_disambiguated += 1
-
-        print_statement = f'\nDisambiguated {fully_disambiguated} words out of {len(words)} (including proper names)'
-        if not count_proper_names:
-            print_statement = f'\nDisambiguated {fully_disambiguated} words out of {len(words)} (excluding proper names)'
-        print(print_statement)
-
-        ratio = fully_disambiguated / len(words)
+        ratio = difference / ambiguous_dichrona_in_open_syllables_before
         return ratio
     
     def print_evaluation(self, text):
-        print(f'\nEVALUATION')
-        print('******************')
-        print(f"\nInput text:\n{text[:30]}...")
-        macronized_text = self.macronize_text(text)
-        print(f"\nMacronized text:\n{macronized_text[:30]}...")
-        ratio = self.macronization_ratio_words(macronized_text)
-        print(f"\nMacronization ratio: {ratio:.2f}")
-        ratio = self.macronization_ratio_words(macronized_text, count_proper_names=False)
-        print(f"\nMacronization ratio (no proper names): {ratio:.2f}")
+        pass
 
