@@ -1,5 +1,3 @@
-from grc_utils import oxia_to_tonos
-
 grave_to_acute = {
     'ὰ': 'ά',
     'ὲ': 'έ',
