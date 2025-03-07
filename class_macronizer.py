@@ -160,13 +160,15 @@ class Macronizer:
 
         ratio = fully_disambiguated / len(words)
         return ratio
+    
+    def print_evaluation(self, text):
+        print(f'\nEVALUATION')
+        print('******************')
+        print(f"\nInput text:\n{text[:30]}...")
+        macronized_text = self.macronize_text(text)
+        print(f"\nMacronized text:\n{macronized_text[:30]}...")
+        ratio = self.macronization_ratio_words(macronized_text)
+        print(f"\nMacronization ratio: {ratio:.2f}")
+        ratio = self.macronization_ratio_words(macronized_text, count_proper_names=False)
+        print(f"\nMacronization ratio (no proper names): {ratio:.2f}")
 
-# Example usage:
-if __name__ == "__main__":
-    macronizer = Macronizer()
-    
-    # Test single word
-    print(macronizer.macronize(["ἀγαθός"])) # {'ἀγαθός': 'ᾰ̓γᾰθός'}
-    
-    # Test text with spaces and punctuation
-    print(macronizer.macronize_text("ἀγαθὸς, καλὸς, ἀνήρ"))
