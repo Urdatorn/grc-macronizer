@@ -139,11 +139,11 @@ class Macronizer:
                 tokens[i] = macronized_map.get(original_word, original_word)
 
         end_time = time.perf_counter()
-        print(f"Elapsed time: {end_time - start_time:.2f} seconds")
+        print(f"\nMacronization took {end_time - start_time:.2f} seconds")
 
         return "".join(tokens)
     
-    def macronization_ratio(self, text, count_proper_names=True):
+    def macronization_ratio(self, text, macronized_text, count_proper_names=True):
         def remove_proper_names(text):
             # Build a regex pattern that matches whole words from the set
             pattern = r'\b(?:' + '|'.join(re.escape(name) for name in proper_names) + r')\b'
@@ -153,14 +153,22 @@ class Macronizer:
             cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
 
             return cleaned_text
-        
+        start_time = time.perf_counter()
+
         text = normalize_word(text)
         if not count_proper_names:
             text = remove_proper_names(text)
 
         ambiguous_dichrona_in_open_syllables_before = count_ambiguous_dichrona_in_open_syllables(text)
-        ambiguous_dichrona_in_open_syllables_after = count_ambiguous_dichrona_in_open_syllables(self.macronize_text(text))
+        ambiguous_dichrona_in_open_syllables_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
         difference = ambiguous_dichrona_in_open_syllables_before - ambiguous_dichrona_in_open_syllables_after
+
+        end_time = time.perf_counter()
+        print(f"\nEvaluation took {end_time - start_time:.2f} seconds")
+
+        print(f"Ambiguous dichrona in open syllables before: {ambiguous_dichrona_in_open_syllables_before}")
+        print(f"Ambiguous dichrona in open syllables after: {ambiguous_dichrona_in_open_syllables_after}")
+        print(f"Difference: {difference}")
 
         ratio = difference / ambiguous_dichrona_in_open_syllables_before
         return ratio
