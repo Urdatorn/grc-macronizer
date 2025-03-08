@@ -1,15 +1,8 @@
 # Macronizing the TLG
 
-##
+A macronizer geared towards batch macronizing large corpora with machine-friendly markup, avoiding combining diacritics and everything that don't render in standard IDE and terminal fonts.
 
-### TODO
-- macronize-everything function!
-- Macronisation must work on syllable level and not word level; i.e. combination of macronisations must be possible
-  - Should this mean several runs thorugh the text? Or just more time spend on every run.
-
-NB: For Logion, the end product will be an **"aggressive" macronizer**, i.e. it will attempt to macronize all true dichrona in open syllables. For human users, a subtler version that presupposes knowledge of the constrictions on Attic vowel lenghts (the four accent rules) is more didactically useful.
-
-Hence, there should be a final step of aggression, i.e. a four-accent-rule macronizer. 
+Start [here](macronize.ipynb).
 
 ## Method
 _Notes and definitions_:
@@ -81,7 +74,7 @@ graph TD
     DecisionMeter -->|No| Keep[Keep macrons as is]
 ```
 
-### Methodological problem										
+<!-- ### Methodological problem										
 
 Wiktionary works under the following conventions:
 
@@ -89,4 +82,4 @@ Wiktionary works under the following conventions:
 
 Cf. https://en.wiktionary.org/wiki/Wiktionary:About_Ancient_Greek (accessed 4 dec. 2024)
 
-- Specific problem 1: Marking of superheavies is in general irreducibly conjectural: Wiktionary's decisions are often scientifically unfounded.
+- Specific problem 1: Marking of superheavies is in general irreducibly conjectural: Wiktionary's decisions are often scientifically unfounded. -->

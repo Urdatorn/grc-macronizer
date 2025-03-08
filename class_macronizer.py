@@ -3,8 +3,8 @@ import sqlite3
 import time
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
-from format_macrons import macron_unicode_to_markup
-from grc_utils import count_ambiguous_dichrona_in_open_syllables, has_ambiguous_dichrona_in_open_syllables, no_macrons, normalize_word, syllabifier, vowel
+from format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
+from grc_utils import count_ambiguous_dichrona_in_open_syllables, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from hypotactic import hypotactic
 from proper_names import proper_names
 
@@ -16,53 +16,6 @@ def get_words(text):
             words = re.findall(r'[\w^_]+', text) # remember that we are now acting on integrated markup with carets and underscores
             return [word for word in words if any(vowel(char) for char in word)] # extra precaution: all grc words have vowels
 
-def merge_or_overwrite_markup(new_version, old_version):
-    '''
-    Merges two versions of a string with markup (^ and _), following these rules:
-    1. If one version has markup at position i and other doesn't, use the markup
-    2. If versions disagree at position i, use new_version's markup
-    3. If versions agree, use that markup
-    
-    >>> merge_or_overwrite_markup('st_ring^', 's_t^ring^')
-    's_t_ring^'
-    '''
-    # First, get base string without markup
-    base = ''.join(c for c in new_version if c not in '^_')
-    
-    # Create lists to track markup positions
-    new_markup = [''] * len(base)
-    old_markup = [''] * len(base)
-    
-    # Fill markup positions for new version
-    pos = 0
-    for i, c in enumerate(new_version):
-        if c in '^_':
-            new_markup[pos-1] = c
-        else:
-            pos += 1
-            
-    # Fill markup positions for old version
-    pos = 0
-    for i, c in enumerate(old_version):
-        if c in '^_':
-            old_markup[pos-1] = c
-        else:
-            pos += 1
-    
-    # Merge according to rules
-    result = []
-    pos = 0
-    for i, c in enumerate(base):
-        result.append(c)
-        # Rule 1 & 2 & 3: If new has markup, use it
-        if new_markup[i]:
-            result.append(new_markup[i])
-        # Rule 1: If only old has markup, use it
-        elif old_markup[i]:
-            result.append(old_markup[i])
-            
-    return ''.join(result)
-
 class Macronizer:
     """A class to handle macronization of Greek text using databases."""
     
@@ -70,7 +23,7 @@ class Macronizer:
                  macronize_everything=True,
                  unicode=False,
                  ifeellucky=True,
-                 wiktionary_db_file='/Users/albin/git/grc-wiktionary/grc_macrons.db', 
+                 wiktionary_db_file='db/grc_macrons.db', 
                  hypotactic_db_file='db/hypotactic.db', 
                  aristophanes_db_file=None, 
                  custom_db_file=None):
@@ -219,47 +172,60 @@ class Macronizer:
         ratio = difference / ambiguous_dichrona_in_open_syllables_before
         return ratio
     
-    # def apply_accentuation_rules(self, string):
-    #     if not string:
-    #         return []
+    def apply_accentuation_rules(self, old_version):
+        if not old_version:
+            return old_version
+        old_version = normalize_word(old_version)
+        new_version = old_version.replace('_', '').replace('^', '') # this will be updated later
 
-    #     string = normalize_word(string)
+        list_of_syllables = syllabifier(old_version) # important: needs to use old_version, for markup to potentially decide short_vowel and long_acute
+        total_syllables = len(list_of_syllables)
+
+        syllable_positions = [ # can't filter out sylls here because I want to join them later
+            (-(total_syllables - i), syllable)  # Position from the end
+            for i, syllable in enumerate(list_of_syllables)
+        ]
+
+        if not syllable_positions:
+            return old_version
+        print(syllable_positions) # debugging
         
-    #     words = re.findall(r'[\w_^]+', string)
-    #     for word in words:
-    #         list_of_syllables = syllabifier(word) # I've updated the syllabifier to support markup (^, _)
-    #         total_syllables = len(list_of_syllables)
+        ultima = list_of_syllables[-1] # note that these may contain markup
+        penultima = list_of_syllables[-2]
 
-    #         dichronic_open_syllable_positions = [
-    #             (-(total_syllables - i), syllable)  # Position from the end
-    #             for i, syllable in enumerate(list_of_syllables)
-    #             if word_with_real_dichrona(syllable) and open_syllable(syllable)
-    #         ]
-    #         #print(dichronic_open_syllable_positions) # debugging
-
-    #         if not dichronic_open_syllable_positions:
-    #             continue
+        modified_syllable_positions = []
+        for position, syllable in syllable_positions:
+            modified_syllable = syllable.replace('_', '').replace('^', '')  # Create a new variable to store modifications
+            if position == -2 and paroxytone(new_version) and short_vowel(ultima):
+                print(f'{syllable}: paroxytone, short ultima')
+                # Find the last vowel in syllable and append '^' after it
+                for i in range(len(syllable)-1, -1, -1): # NB: len(syllable)-1 is the index of the last character (0-indexed); -1 is to go backwards
+                    if vowel(syllable[i]):
+                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
+                        break
+            elif position == -1 and paroxytone(new_version) and long_acute(penultima):
+                print(f'{syllable}: paroxytone with long acute')
+                # Find the last vowel in syllable and append '_' after it
+                for i in range(len(syllable)-1, -1, -1):
+                    if vowel(syllable[i]):
+                        modified_syllable = syllable[:i+1] + '_' + syllable[i+1:]
+                        break
+            elif position == -1 and (properispomenon(new_version) or proparoxytone(new_version)):
+                if properispomenon(new_version):
+                    print(f'{syllable}: properispomenon')
+                elif proparoxytone(new_version):
+                    print(f'{syllable}: proparoxytone')
+                # Find the last vowel in syllable and append '^' after it
+                for i in range(len(syllable)-1, -1, -1):
+                    if vowel(syllable[i]):
+                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
+                        break
+            modified_syllable_positions.append((position, modified_syllable))
             
-    #         if total_syllables < 2:
-    #             count += 1
-    #             continue
-            
-    #         ultima = list_of_syllables[-1]
-    #         penultima = list_of_syllables[-2]
+        print("Modified syllable positions:", modified_syllable_positions) # new debug print
+        new_version = ''.join(syllable for _, syllable in modified_syllable_positions)
+        print("New version:", new_version) # debugging
 
-    #         for position, syllable in dichronic_open_syllable_positions:
-    #             if position == -2 and paroxytone(word) and short_vowel(ultima):
-    #                 continue  # Penultima disambiguated
-    #             elif position == -1 and paroxytone(word) and long_acute(penultima):
-    #                 continue  # Ultima disambiguated
-    #             elif position == -1 and properispomenon(word) or proparoxytone(word):
-    #                 continue  # Ultima disambiguated
-    #             elif any(char in '^_' for char in syllable): # means syllable has been macronized already
-    #                 continue
-    #             else:
-    #                 count += 1
+        merged = merge_or_overwrite_markup(new_version, old_version)
+        return merged
 
-    #     return count
-
-
-assert merge_or_overwrite_markup('st_ring^', 's_t^ring^') == 's_t_ring^'

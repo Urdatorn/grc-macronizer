@@ -108,11 +108,6 @@ def macron_markup_to_unicode(text):
     return result
 
 
-anabasis_unicode_test = '''Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δῠ́ο, πρεσβῠ́τερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος· ἐπεὶ δὲ ἠσθένει Δαρεῖος καὶ ῠ̔πώπτευε τελευτὴν τοῦ βῐ́ου, ἐβούλετο τὼ παῖδε ᾰ̓μφοτέρω πᾰρεῖναι. ὁ μὲν οὖν πρεσβῠ́τερος πᾰρὼν ἐτύγχᾰνε· Κῦρον δὲ μετᾰπέμπεται ἀπὸ τῆς ἀρχῆς ἧς αὐτὸν σατράπην ἐποίησε, καὶ στρατηγὸν δὲ αὐτὸν ἀπέδειξε πᾰ́ντων ὅσοι ἐς Καστωλοῦ πεδίον ἁθροίζονται. ᾰ̓νᾰβαίνει οὖν ὁ Κῦρος λᾰβὼν Τισσαφέρνην ὡς φῐ́λον, καὶ τῶν Ἑλλήνων ἔχων ὁπλῑ́τᾱς ᾰ̓νέβη τρῐᾱκοσῐ́ους, ᾰ̓́ρχοντᾰ δὲ αὐτῶν Ξενίαν Παρράσιον. ἐπεὶ δὲ ἐτελεύτησε Δαρεῖος καὶ κᾰτέστη εἰς τὴν βᾰσῐλείᾱν Ἀρταξέρξης, Τισσαφέρνης διαβάλλει τὸν Κῦρον πρὸς τὸν ᾰ̓δελφὸν ὡς ἐπῐβουλεύοι αὐτῷ. ὁ δὲ πείθεται καὶ σῠλλᾰμβᾰ́νει Κῦρον ὡς ἀποκτενῶν·'''
-anabasis_markup_test = macron_unicode_to_markup(anabasis_unicode_test)
-assert macron_markup_to_unicode(anabasis_markup_test) == anabasis_unicode_test
-
-
 def macron_integrate_markup(word, macrons):
     '''    
     >>> macron_integrate_markup('νεανίας', '_3,^5,_6')
@@ -176,6 +171,9 @@ def merge_or_overwrite_markup(new_version, old_version):
     >>> merge_or_overwrite_markup('st_ring^', 's_t^ring^')
     's_t_ring^'
     '''
+    if not new_version or not old_version:
+        return new_version or old_version
+    
     # First, get base string without markup
     base = ''.join(c for c in new_version if c not in '^_')
     
@@ -213,6 +211,4 @@ def merge_or_overwrite_markup(new_version, old_version):
             
     return ''.join(result)
 
-
-
-
+assert merge_or_overwrite_markup('st_ring^', 's_t^ring^') == 's_t_ring^'
