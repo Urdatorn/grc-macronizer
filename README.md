@@ -2,10 +2,10 @@
 
 ##
 
-test test
-
-Additions to the "stupid" db lookups
-- simple logic to map barytone words to acute
+### TODO
+- macronize-everything function!
+- Macronisation must work on syllable level and not word level; i.e. combination of macronisations must be possible
+  - Should this mean several runs thorugh the text? Or just more time spend on every run.
 
 NB: For Logion, the end product will be an **"aggressive" macronizer**, i.e. it will attempt to macronize all true dichrona in open syllables. For human users, a subtler version that presupposes knowledge of the constrictions on Attic vowel lenghts (the four accent rules) is more didactically useful.
 
