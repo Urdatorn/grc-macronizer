@@ -26,8 +26,12 @@ def macron_unicode_to_markup(text):
     >>> macron_unicode_to_markup('νεᾱνῐ́ᾱς')
     >>> νεα_νί^α_ς
 
-    (I grappled with a unicode bug for a LONG time! The solution came from Grok 3)
+    NB1: Sending markup through this is fine; it will do nothing.
+    NB2: I grappled with a unicode bug for a LONG time! The solution came from Grok 3.
     '''
+    if not SHORT in text and not LONG in text:
+        return text
+
     # Step 1: Decompose into base characters and combining marks
     decomposed = unicodedata.normalize('NFD', text)
     
@@ -71,6 +75,9 @@ def macron_markup_to_unicode(text):
     '''
     >>> assert macron_markup_to_unicode('νεα_νί^α_ς') == 'νεᾱνῐ́ᾱς'
     '''
+    if not '_' in text and not '^' in text:
+        return text
+
     result = ''
     i = 0
     while i < len(text):
