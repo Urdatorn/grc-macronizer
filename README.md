@@ -2,7 +2,9 @@
 
 A macronizer geared towards batch macronizing large corpora with machine-friendly markup, avoiding combining diacritics and everything that don't render in standard IDE and terminal fonts.
 
-Start [here](macronize.ipynb).
+The only requirement is to clone and install my [grc-utils](https://github.com/Urdatorn/grc-utils/).
+
+Start macronizing [here](macronize.ipynb).
 
 ## Method
 _Notes and definitions_:
