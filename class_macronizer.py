@@ -3,8 +3,8 @@ import sqlite3
 import time
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
-from format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import count_ambiguous_dichrona_in_open_syllables, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
+from format_macrons import macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
+from grc_utils import count_ambiguous_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from hypotactic import hypotactic
 from proper_names import proper_names
 
@@ -99,12 +99,16 @@ class Macronizer:
                 # If still no matches, return original word
                 else:
                     results[original_word] = original_word
+        
+        # Finally, apply accent rules and merge markup
+        results = {k: self.apply_accentuation_rules(v) for k, v in results.items()} # applied to v to make use of disambiguated dichronic ultima and penultima
 
         if self.unicode:
-            return results
-
-        results.update((k, macron_unicode_to_markup(v)) for k, v in results.items())
-        return results
+            # Convert to Unicode format
+            return {k: macron_markup_to_unicode(v) for k, v in results.items()}
+        
+        # Convert to markup format
+        return {k: macron_unicode_to_markup(v) for k, v in results.items()}
 
     def macronize_text(self, text):
         """
@@ -121,7 +125,9 @@ class Macronizer:
         # Check if there's whitespace in the text
         if not re.search(r'\s', text):
             single_result = self.macronize([text])
-            return single_result[text]
+            if single_result and text in single_result:
+                return single_result[text]
+            return text
         
         # Split into tokens
         tokens = re.findall(r'\w+|[^\w\s]+|\s+', text)
@@ -176,6 +182,7 @@ class Macronizer:
         if not old_version:
             return old_version
         old_version = normalize_word(old_version)
+        old_version = macron_unicode_to_markup(old_version)
         new_version = old_version.replace('_', '').replace('^', '') # this will be updated later
 
         list_of_syllables = syllabifier(old_version) # important: needs to use old_version, for markup to potentially decide short_vowel and long_acute
@@ -190,34 +197,28 @@ class Macronizer:
             return old_version
         print(syllable_positions) # debugging
         
-        ultima = list_of_syllables[-1] # note that these may contain markup
-        penultima = list_of_syllables[-2]
+        ultima = list_of_syllables[-1]
+        penultima = list_of_syllables[-2] if len(list_of_syllables) > 1 else None
 
         modified_syllable_positions = []
         for position, syllable in syllable_positions:
             modified_syllable = syllable.replace('_', '').replace('^', '')  # Create a new variable to store modifications
             if position == -2 and paroxytone(new_version) and short_vowel(ultima):
-                print(f'{syllable}: paroxytone, short ultima')
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1): # NB: len(syllable)-1 is the index of the last character (0-indexed); -1 is to go backwards
-                    if vowel(syllable[i]):
+                    if vowel(syllable[i]) and i in DICHRONA:
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             elif position == -1 and paroxytone(new_version) and long_acute(penultima):
-                print(f'{syllable}: paroxytone with long acute')
                 # Find the last vowel in syllable and append '_' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]):
+                    if vowel(syllable[i]) and i in DICHRONA:
                         modified_syllable = syllable[:i+1] + '_' + syllable[i+1:]
                         break
             elif position == -1 and (properispomenon(new_version) or proparoxytone(new_version)):
-                if properispomenon(new_version):
-                    print(f'{syllable}: properispomenon')
-                elif proparoxytone(new_version):
-                    print(f'{syllable}: proparoxytone')
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]):
+                    if vowel(syllable[i]) and i in DICHRONA:
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             modified_syllable_positions.append((position, modified_syllable))

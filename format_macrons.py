@@ -29,8 +29,8 @@ def macron_unicode_to_markup(text):
     NB1: Sending markup through this is fine; it will do nothing.
     NB2: I grappled with a unicode bug for a LONG time! The solution came from Grok 3.
     '''
-    if not SHORT in text and not LONG in text:
-        return text
+    #if not SHORT in text and not LONG in text:
+    #    return text
 
     # Step 1: Decompose into base characters and combining marks
     decomposed = unicodedata.normalize('NFD', text)
@@ -68,8 +68,9 @@ def macron_unicode_to_markup(text):
     # semicolon (U+003B) -> Greek question mark (U+037E)
     result = result.replace('\u00b7', '\u0387')
     result = result.replace('\u003b', '\u037e')
-    return result
+    return normalize_word(result)
 
+print(macron_unicode_to_markup('νεᾱνῐ́ᾱς'))
 
 def macron_markup_to_unicode(text):
     '''
