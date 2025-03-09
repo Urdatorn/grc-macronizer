@@ -70,7 +70,6 @@ def macron_unicode_to_markup(text):
     result = result.replace('\u003b', '\u037e')
     return normalize_word(result)
 
-print(macron_unicode_to_markup('νεᾱνῐ́ᾱς'))
 
 def macron_markup_to_unicode(text):
     '''

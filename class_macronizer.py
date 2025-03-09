@@ -4,7 +4,7 @@ import time
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
 from format_macrons import macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import count_ambiguous_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
+from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from hypotactic import hypotactic
 from proper_names import proper_names
 
@@ -100,14 +100,15 @@ class Macronizer:
                 else:
                     results[original_word] = original_word
         
-        # Finally, apply accent rules and merge markup
-        results = {k: self.apply_accentuation_rules(v) for k, v in results.items()} # applied to v to make use of disambiguated dichronic ultima and penultima
+        # Finally, apply accent rules
+        if self.macronize_everything:
+            results = {k: self.apply_accentuation_rules(v) for k, v in results.items()} # applied to v to make use of disambiguated dichronic ultima and penultima
 
         if self.unicode:
-            # Convert to Unicode format
+            # Optional: convert to Unicode format
             return {k: macron_markup_to_unicode(v) for k, v in results.items()}
         
-        # Convert to markup format
+        # Normalize to markup format
         return {k: macron_unicode_to_markup(v) for k, v in results.items()}
 
     def macronize_text(self, text):
@@ -148,7 +149,7 @@ class Macronizer:
 
         return "".join(tokens)
     
-    def macronization_ratio(self, text, macronized_text, count_proper_names=True):
+    def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
         def remove_proper_names(text):
             # Build a regex pattern that matches whole words from the set
             pattern = r'\b(?:' + '|'.join(re.escape(name) for name in proper_names) + r')\b'
@@ -164,18 +165,29 @@ class Macronizer:
         if not count_proper_names:
             text = remove_proper_names(text)
 
-        ambiguous_dichrona_in_open_syllables_before = count_ambiguous_dichrona_in_open_syllables(text)
-        ambiguous_dichrona_in_open_syllables_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
-        difference = ambiguous_dichrona_in_open_syllables_before - ambiguous_dichrona_in_open_syllables_after
+        count_before = 0
+        count_after = 0
+
+        if not count_all_dichrona:
+            count_before = count_ambiguous_dichrona_in_open_syllables(text)
+            count_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
+            print(f"Dichrona in open syllables not covered by accent rules before: {count_before}")
+            print(f"Dichrona in open syllables not covered by accent rules after: {count_after}")
+        else:
+            count_before = count_dichrona_in_open_syllables(text)
+            count_after = count_dichrona_in_open_syllables(macronized_text)
+            print(f"Dichrona in open syllables before: {count_before}")
+            print(f"Unmacronized dichrona in open syllables left: {count_after}")
+            
+        difference = count_before - count_after
 
         end_time = time.perf_counter()
         print(f"\nEvaluation took {end_time - start_time:.2f} seconds")
 
-        print(f"Dichrona in open syllables not covered by accent rules before: {ambiguous_dichrona_in_open_syllables_before}")
-        print(f"Dichrona in open syllables not covered by accent rules after: {ambiguous_dichrona_in_open_syllables_after}")
+
         print(f"Difference: {difference}")
 
-        ratio = difference / ambiguous_dichrona_in_open_syllables_before
+        ratio = difference / count_before
         return ratio
     
     def apply_accentuation_rules(self, old_version):
@@ -195,7 +207,6 @@ class Macronizer:
 
         if not syllable_positions:
             return old_version
-        print(syllable_positions) # debugging
         
         ultima = list_of_syllables[-1]
         penultima = list_of_syllables[-2] if len(list_of_syllables) > 1 else None
@@ -223,9 +234,9 @@ class Macronizer:
                         break
             modified_syllable_positions.append((position, modified_syllable))
             
-        print("Modified syllable positions:", modified_syllable_positions) # new debug print
+        #print("Modified syllable positions:", modified_syllable_positions) # new debug print
         new_version = ''.join(syllable for _, syllable in modified_syllable_positions)
-        print("New version:", new_version) # debugging
+        #print("New version:", new_version) # debugging
 
         merged = merge_or_overwrite_markup(new_version, old_version)
         return merged
