@@ -168,12 +168,16 @@ def macron_integrate_markup(word, macrons):
     return normalize_word(result)
 
 
-def merge_or_overwrite_markup(new_version, old_version):
+def merge_or_overwrite_markup(new_version, old_version, precedence='new'):
     '''
     Merges two versions of a string with markup (^ and _), following these rules:
     1. If one version has markup at position i and other doesn't, use the markup
-    2. If versions disagree at position i, use new_version's markup
+    2. If versions disagree at position i, use the markup of whatever version takes precedence
     3. If versions agree, use that markup
+
+    This boils down to:
+    - If the version with precedence has markup, use it
+    - but if only the other has markup, use that one
     
     >>> merge_or_overwrite_markup('st_ring^', 's_t^ring^')
     's_t_ring^'
@@ -209,12 +213,20 @@ def merge_or_overwrite_markup(new_version, old_version):
     pos = 0
     for i, c in enumerate(base):
         result.append(c)
-        # Rule 1 & 2 & 3: If new has markup, use it
-        if new_markup[i]:
-            result.append(new_markup[i])
-        # Rule 1: If only old has markup, use it
-        elif old_markup[i]:
-            result.append(old_markup[i])
+        if precedence == 'new': 
+            # If new has markup, use it
+            if new_markup[i]:
+                result.append(new_markup[i])
+            # If only old has markup, use it
+            elif old_markup[i]:
+                result.append(old_markup[i])
+        else:
+            # If old has markup, use it
+            if old_markup[i]:
+                result.append(old_markup[i])
+            # If only new has markup, use it
+            elif new_markup[i]:
+                result.append(new_markup[i])
             
     return ''.join(result)
 
