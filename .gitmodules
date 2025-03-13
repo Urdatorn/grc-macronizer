@@ -1,0 +1,6 @@
+[submodule "grc-utils"]
+	path = grc-utils
+	url = https://github.com/Urdatorn/grc-utils.git
+[submodule "greek_proper_names_cltk"]
+	path = greek_proper_names_cltk
+	url = https://github.com/Urdatorn/greek_proper_names_cltk.git
