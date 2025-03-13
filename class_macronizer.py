@@ -1,11 +1,11 @@
 import re
 import sqlite3
 import time
+from tqdm import tqdm
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
-from format_macrons import macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
+from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
-from hypotactic import hypotactic
 from greek_proper_names_cltk.proper_names import proper_names
 
 def check_word(word):
@@ -20,6 +20,7 @@ class Macronizer:
     """A class to handle macronization of Greek text using databases."""
     
     def __init__(self, 
+                 genre='prose',
                  macronize_everything=True,
                  unicode=False,
                  ifeellucky=True,
@@ -28,7 +29,7 @@ class Macronizer:
                  aristophanes_db_file=None, 
                  custom_db_file=None):
 
-        
+        self.genre = genre
         self.macronize_everything = macronize_everything
         self.unicode = unicode
         self.ifeellucky = ifeellucky
@@ -37,38 +38,48 @@ class Macronizer:
         self.aristophanes_db_file = aristophanes_db_file
         self.custom_db_file = custom_db_file
 
-        # We could load the database into memory here if we wanted to,
-        # but for now we'll connect each time to keep memory usage lower
+        self.wiktionary_map = {}
+        try:
+            conn = sqlite3.connect(self.wiktionary_db_file)
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT word FROM macrons")
+            rows = cursor.fetchall()
+            conn.close()
 
+            for row in rows:
+                db_word = row[0]
+                normalized_word = normalize_word(no_macrons(db_word))
+                self.wiktionary_map.setdefault(normalized_word, []).append(db_word)
+        except sqlite3.Error as e:
+            print(f"Warning: Could not load wiktionary database: {e}")
+
+        self.hypotactic_map = {}
+        try:
+            conn = sqlite3.connect(self.hypotactic_db_file)
+            cursor = conn.cursor()
+            cursor.execute("SELECT token, macrons FROM annotated_tokens")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            for token, macrons in rows:
+                self.hypotactic_map[token] = macrons
+        except sqlite3.Error as e:
+            print(f"Warning: Could not load hypotactic database: {e}")
+            
     def wiktionary(self, word):
         """
         Looks up a word in the Wiktionary database and returns its macronized form(s).
         
         Args:
             word (str): Word to look up
-            wiktionary_db_path (str): Path to the Wiktionary database file
             
         Returns:
             str or list: Macronized form(s) of the word if found, None if not found
         """
         nw = normalize_word(no_macrons(word))
         
-        # Connect to the SQLite database and fetch all words
-        conn = sqlite3.connect(self.wiktionary_db_file)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT word FROM macrons")
-        rows = cursor.fetchall()
-        conn.close()
-
-        # Build lookup dictionary
-        normalized_map = {}
-        for row in rows:
-            db_word = row[0]
-            normalized_word = normalize_word(no_macrons(db_word))
-            normalized_map.setdefault(normalized_word, []).append(db_word)
-
-        # Look up the word
-        matches = normalized_map.get(nw, [])
+        # Look up the word in the pre-loaded map
+        matches = self.wiktionary_map.get(nw, [])
         if len(matches) == 1:
             return matches[0]
         elif len(matches) > 1:
@@ -77,6 +88,16 @@ class Macronizer:
             else:
                 return matches # work in progress; this should pipe to a POS disambiguator
         return None
+    
+    def hypotactic(self, word):
+        '''
+        >>> hypotactic('ἀγαθῆς')
+        >>> ἀ^γα^θῆς
+        '''
+        macrons = self.hypotactic_map.get(word)
+        if macrons:
+            return macron_integrate_markup(word, macrons)
+        return word
 
     def macronize(self, words):
         """
@@ -92,9 +113,9 @@ class Macronizer:
         """
         # Process each input word
         results = {}
-        for original_word in words:
+        for original_word in tqdm(words, desc="Querying Wiktionary", unit="word"):
             # Try Wiktionary lookup first
-            wikt_result = self.wiktionary(original_word, self.wiktionary_db_file)
+            wikt_result = self.wiktionary(original_word)
             if wikt_result is not None:
                 results[original_word] = wikt_result
                 continue
@@ -102,7 +123,7 @@ class Macronizer:
             # Try replacing grave with acute if no matches
             if original_word and any(char in grave_to_acute for char in original_word):
                 modified_word = replace_grave_with_acute(original_word)
-                wikt_result = self.wiktionary(modified_word, self.wiktionary_db_file)
+                wikt_result = self.wiktionary(modified_word)
                 if wikt_result is not None:
                     if isinstance(wikt_result, list):
                         results[original_word] = [replace_acute_with_grave(word) for word in wikt_result] # work in progress; this should pipe to a POS disambiguator
@@ -110,8 +131,8 @@ class Macronizer:
                         results[original_word] = replace_acute_with_grave(wikt_result)
                     continue
             # Try hypotactic db if grave-acute doesn't help
-            elif hypotactic(original_word) != original_word:
-                results[original_word] = hypotactic(original_word)
+            elif self.hypotactic(original_word) != original_word:
+                results[original_word] = self.hypotactic(original_word)
                 continue
             # If still no matches, return original word
             else:
@@ -169,7 +190,7 @@ class Macronizer:
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
         def remove_proper_names(text):
             # Build a regex pattern that matches whole words from the set
-            pattern = r'\b(?:' + '|'.join(re.escape(name) for name in proper_names) + r')\b'
+            pattern = r'\b(?:' + '|'.join(re.escape(name) for name in tqdm(proper_names, desc="Building proper names pattern")) + r')\b'
 
             # Remove names, handling extra spaces that might appear
             cleaned_text = re.sub(pattern, '', text).strip()
@@ -180,17 +201,20 @@ class Macronizer:
 
         text = normalize_word(text)
         if not count_proper_names:
+            print("\nRemoving proper names...")
             text = remove_proper_names(text)
 
         count_before = 0
         count_after = 0
 
         if not count_all_dichrona:
+            print("\nCounting ambiguous dichrona...")
             count_before = count_ambiguous_dichrona_in_open_syllables(text)
             count_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
             print(f"Dichrona in open syllables not covered by accent rules before: {count_before}")
             print(f"Dichrona in open syllables not covered by accent rules after: {count_after}")
         else:
+            print("\nCounting all dichrona...")
             count_before = count_dichrona_in_open_syllables(text)
             count_after = count_dichrona_in_open_syllables(macronized_text)
             print(f"Dichrona in open syllables before: {count_before}")
@@ -201,10 +225,9 @@ class Macronizer:
         end_time = time.perf_counter()
         print(f"\nEvaluation took {end_time - start_time:.2f} seconds")
 
-
         print(f"Difference: {difference}")
 
-        ratio = difference / count_before
+        ratio = difference / count_before if count_before > 0 else 0
         return ratio
     
     def apply_accentuation_rules(self, old_version):

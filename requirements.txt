@@ -1,3 +1,10 @@
+# Install from submodule
 grc_utils==0.1.0
-jupyter
+
+# odyCy
+spacy>=3.7.4,<3.8.0
+grc_odycy_joint_trf==0.7.0
+
+# other
 lxml
+tqdm>=4.65.0
