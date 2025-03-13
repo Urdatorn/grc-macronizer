@@ -6,7 +6,7 @@ from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_wit
 from format_macrons import macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from hypotactic import hypotactic
-from proper_names import proper_names
+from greek_proper_names_cltk.proper_names import proper_names
 
 def check_word(word):
     return not has_ambiguous_dichrona_in_open_syllables(word)
@@ -40,22 +40,19 @@ class Macronizer:
         # We could load the database into memory here if we wanted to,
         # but for now we'll connect each time to keep memory usage lower
 
-    def macronize(self, words):
+    def wiktionary(self, word):
         """
-        Takes a list of words and returns a dictionary mapping each original word
-        to its macronized form(s). If no matches are found, returns the original word.
-        If no match is found and the input ends with a grave accent, tries with acute.
+        Looks up a word in the Wiktionary database and returns its macronized form(s).
         
         Args:
-            words (list): List of words to macronize
-            ifeellucky (bool): If True, return first match when multiple exist
-        
+            word (str): Word to look up
+            wiktionary_db_path (str): Path to the Wiktionary database file
+            
         Returns:
-            dict: Mapping of original words to their macronized forms
+            str or list: Macronized form(s) of the word if found, None if not found
         """
-        # Normalize and strip macrons from input words once for efficiency
-        normalized_input_words = [normalize_word(no_macrons(w)) for w in words]
-
+        nw = normalize_word(no_macrons(word))
+        
         # Connect to the SQLite database and fetch all words
         conn = sqlite3.connect(self.wiktionary_db_file)
         cursor = conn.cursor()
@@ -67,38 +64,58 @@ class Macronizer:
         normalized_map = {}
         for row in rows:
             db_word = row[0]
-            nw = normalize_word(no_macrons(db_word))
-            normalized_map.setdefault(nw, []).append(db_word)
+            normalized_word = normalize_word(no_macrons(db_word))
+            normalized_map.setdefault(normalized_word, []).append(db_word)
 
+        # Look up the word
+        matches = normalized_map.get(nw, [])
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            if self.ifeellucky:
+                return matches[0]
+            else:
+                return matches # work in progress; this should pipe to a POS disambiguator
+        return None
+
+    def macronize(self, words):
+        """
+        Takes a list of words and returns a dictionary mapping each original word
+        to its macronized form(s). If no matches are found, returns the original word.
+        If no match is found and the input ends with a grave accent, tries with acute.
+        
+        Args:
+            words (list): List of words to macronize
+            
+        Returns:
+            dict: Mapping of original words to their macronized forms
+        """
         # Process each input word
         results = {}
-        for original_word, nw in zip(words, normalized_input_words):
-            matches = normalized_map.get(nw, [])
-            if len(matches) == 1:
-                results[original_word] = matches[0]
-            elif len(matches) > 1:
-                if self.ifeellucky:
-                    results[original_word] = matches[0]
-                else:
-                    results[original_word] = matches # work in progress; this should pipe to a POS disambiguator
-            else:
-                # Try replacing grave with acute if no matches
-                if original_word and any(char in grave_to_acute for char in original_word):
-                    modified_word = replace_grave_with_acute(original_word)
-                    nw_modified = normalize_word(no_macrons(modified_word))
-                    matches = normalized_map.get(nw_modified, [])
-                    if matches:
-                        results[original_word] = (replace_acute_with_grave(matches[0]) 
-                                               if self.ifeellucky 
-                                               else [replace_acute_with_grave(word) for word in matches]) # work in progress; this should pipe to a POS disambiguator
-                        continue
-                # Try hypotactic db if grave-acute doesn't help
-                elif hypotactic(original_word) != original_word:
-                    results[original_word] = hypotactic(original_word)
+        for original_word in words:
+            # Try Wiktionary lookup first
+            wikt_result = self.wiktionary(original_word, self.wiktionary_db_file)
+            if wikt_result is not None:
+                results[original_word] = wikt_result
+                continue
+                
+            # Try replacing grave with acute if no matches
+            if original_word and any(char in grave_to_acute for char in original_word):
+                modified_word = replace_grave_with_acute(original_word)
+                wikt_result = self.wiktionary(modified_word, self.wiktionary_db_file)
+                if wikt_result is not None:
+                    if isinstance(wikt_result, list):
+                        results[original_word] = [replace_acute_with_grave(word) for word in wikt_result] # work in progress; this should pipe to a POS disambiguator
+                    else:
+                        results[original_word] = replace_acute_with_grave(wikt_result)
                     continue
-                # If still no matches, return original word
-                else:
-                    results[original_word] = original_word
+            # Try hypotactic db if grave-acute doesn't help
+            elif hypotactic(original_word) != original_word:
+                results[original_word] = hypotactic(original_word)
+                continue
+            # If still no matches, return original word
+            else:
+                results[original_word] = original_word
         
         # Finally, apply accent rules
         if self.macronize_everything:
