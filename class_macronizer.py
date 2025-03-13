@@ -113,7 +113,7 @@ class Macronizer:
         """
         # Process each input word
         results = {}
-        for original_word in tqdm(words, desc="Querying Wiktionary", unit="word"):
+        for original_word in tqdm(words, desc="Querying Wiktionary", unit="word", leave=False):
             # Try Wiktionary lookup first
             wikt_result = self.wiktionary(original_word)
             if wikt_result is not None:
