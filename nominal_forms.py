@@ -1,9 +1,15 @@
 '''
-ALGORITHMIC MACRONIZING PART 2
+ALGORITHMIC MACRONIZING: NOMINAL FORMS
 
-See page 38 in CGCG for endings of nominal forms.
+(barytone)
+(accentual rules) 
+(nominal forms) *YOU ARE HERE*
+(inheritance)
 
-RULES OF NOMINAL FORMS
+
+See page 38 in CGCG for endings of nominal forms: ref/cgcg_nominal_forms.png
+
+SUMMARY OF THE RELEVANT RULES OF NOMINAL FORMS
 
 #1D (fem)
 - Nom and ac and voc sing -α are LONG if they come from a lemma which has an Ionian -η counterpart (needs to search lexica).
@@ -11,35 +17,27 @@ RULES OF NOMINAL FORMS
 - Acc pl => long ας if lemma is clearly 1D, i.e. is on -α or -η (because acc pl fem of 3D are short).
 
 #2D
-Nom and acc pl (neut): => short α (the only dichronon; Same as neuter pl 3D.)
+- Nom and acc pl (neut): => short α (the only dichronon; Same as neuter pl 3D.)
 
 #3D
-Dat sing: short ι (all datives on iota are short)
-Acc sing (masc) => short α
-Nom and acc pl (neut) => short α, i.e. if noun is masc or neut and ends on -α, that α is short***
-Dat pl: short ι; see dat sing.
-Acc pl (masc) => short α. Cf. 1D acc pl.
+- Dat sing: short ι (all datives on iota are short)
+- Acc sing (masc) => short α
+- Nom and acc pl (neut) => short α, i.e. if noun is masc or neut and ends on -α, that α is short***
+- Dat pl: short ι; see dat sing.
+- Acc pl (masc) => short α. Cf. 1D acc pl.
 
 ***NB: Note that some *dual* forms (1D on -ης) can be masculine on long -α, e.g. τὼ προφήτᾱ, ὁπλῑ́τᾱ (cf. voc. sing. ὠ προφῆτα)
 Probably hyper rare/inexistent in the corpus and not the case for 2D/3D and the most common masc duals like χεροῖν, χεῖρε.
+Duals like χεροῖν also break the dative rule. Hence all duals are excluded.
 
-This yields the following three fully generalizable rules:
-    (1) for tokens with tag Acc pl fem (^n.p...fa.$) and lemma ending with η or α, ending -ας is long
-    (2) for tokens with tag masc and neutre nouns (^n.....[mn]..$), ending -α is short regardless of case
-    (3) for dat (^n......d.$), then ending -ι is short
-
+This yields the following six fully generalizable rules:
     
-Make a function long_acc_pl_fem(token, tag, lemma): 
-if the last two characters of only_bases(token) is ας, tag passes ^n.p...fa.$, and the last character of lemma is η or α,
-then let macron = f"_{ordinal_last_vowel(token)}" and return macron
-
-Make a function short_masc_alpha(token, tag):
-if the last character of only_bases(token) is α, and tag passes ^n.....[mn]..$,
-then let breve = f"^{ordinal_last_vowel(token)}" and return breve
-
-Make a function short_dat(token, tag):
-if the last character of only_bases(token) is ι, and tag passes ^n......d.$, 
-then let breve = f"^{ordinal_last_vowel(token)}"
+    (1) -α_ for 1D nouns in nominative/vocative singular feminine
+    (2) -α_ν for 1D nouns in accusative singular feminine
+    (3) -α_ς for 1D nouns in genitive singular feminine
+    (4) nouns in accusative plural feminine, and lemma ending with η or α, ending -ας is long
+    (5) for all masculine and neutre nouns, the ending -α is short
+    (6) for all datives, the ending -ι is short
 '''
 
 import warnings
@@ -77,8 +75,8 @@ def macronize_nominal_forms(word):
         pos = token.pos_
         morph = token.morph
 
-        if pos != "NOUN":
-            return None
+    if pos != "NOUN" or "Dual" in morph.get("Number"):
+        return None
 
     print(f'{word}: {lemma}, {pos}, {morph}')
 
@@ -156,6 +154,9 @@ def macronize_nominal_forms(word):
 #test
 input = "κιθάρα"
 input = "μάχαιρα"
+print(macronize_nominal_forms(input))
+
+input = "χεροῖν"
 print(macronize_nominal_forms(input))
 
 input = "γυναιξί" #γυναιξί: γυνή, NOUN, Case=Dat|Gender=Fem|Number=Plur; why is it not returning γυναιξί^?
