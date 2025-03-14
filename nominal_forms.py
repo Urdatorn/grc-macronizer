@@ -58,6 +58,12 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 nlp = grc_odycy_joint_trf.load()
 
 def macronize_nominal_forms(word):
+    '''
+    This function should only be called if ultima or penultima is not yet macronized.
+    It is slow and because of its complexity, bug prone.
+    A large chunk of its use cases should be covered by the accent-rule method.
+    It is primarily useful for *oxytones*.
+    '''
 
     word = word.strip('^').strip('_')
     doc = nlp(word)
@@ -74,6 +80,8 @@ def macronize_nominal_forms(word):
         if pos != "NOUN":
             return None
 
+    print(f'{word}: {lemma}, {pos}, {morph}')
+
     def first_declination(word, lemma, morph):
         '''
         Nominal-form algorithms for 1st declension endings.
@@ -83,6 +91,7 @@ def macronize_nominal_forms(word):
         if only_bases(word)[-1:] == "α" and word == lemma and morph.get("Case") in ["Nom", "Voc"] and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
             etacist_version = word[:-1] + "η"
             if any(etacist_version[:-1] == ionic_word[:-1] and etacist_version[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
+                print(f'{word}: 1D case 1')
                 return word + "_"
 
         # -α_ν for 1D nouns in accusative singular feminine
@@ -90,23 +99,38 @@ def macronize_nominal_forms(word):
             if lemma[-1] in ["η", "α"]:
                 etacist_lemma = lemma[:-1] + "η"
                 if any(etacist_lemma[:-1] == ionic_word[:-1] and etacist_lemma[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
+                    print(f'{word}: 1D case 2')
                     return word + "_"
 
         # -α_ς for 1D nouns in genitive singular feminine
         elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Gen" and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+            print(f'{word}: 1D case 3')
             return word[:-1] + "_" + word[-1]
         
         # -α_ς for 1D nouns in accusative plural feminine
         elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Acc" and morph.get("Number") == "Pl" and morph.get("Gender") == "Fem":
             if lemma[-1] in ["η", "α"]:
-                # Insert a macron (_) between the last two characters of the word
+                print(f'{word}: 1D case 4')
                 return word[:-1] + "_" + word[-1]
         
         return None
-
+    
+    def masc_and_neutre_short_alpha(word, morph):
+        if only_bases(word)[-1:] == "α" and morph.get("Gender") in ["Masc", "Neut"]:
+            print(f'{word}: Masc/Neut short alpha')
+            return word + "^"
+        
+        return None
+    
     # Call the first_declination function
     result = first_declination(word, lemma, morph)
     if result:
         return result
     
     return word
+
+
+#test
+input = "κιθάρα"
+input = "μάχαιρα"
+print(macronize_nominal_forms(input))
