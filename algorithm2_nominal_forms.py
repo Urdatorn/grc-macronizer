@@ -52,8 +52,6 @@ import csv
 import unicodedata
 
 from grc_utils import Colors, DICHRONA, only_bases, all_vowels, is_diphthong, has_iota_adscriptum, ordinal_last_vowel
-from algorithm1_accentual_rules import 
-from collate_macrons import collate_macrons
 
 
 ### ALGORITHMS RE NOMINAL FORMS

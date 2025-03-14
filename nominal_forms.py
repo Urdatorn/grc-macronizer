@@ -5,9 +5,10 @@ See page 38 in CGCG for endings of nominal forms.
 
 RULES OF NOMINAL FORMS
 
-#1D
-Nom and ac and voc sing can be either, depending on whether or not it comes from ionian -η. Tricky...
-Acc pl => long ας; however acc pl fem of 3D are short: so if lemma is clearly 1D, ending is long
+#1D (fem)
+- Nom and ac and voc sing -α are LONG if they come from a lemma which has an Ionian -η counterpart (needs to search lexica).
+- Gen sing -ας is always long
+- Acc pl => long ας if lemma is clearly 1D, i.e. is on -α or -η (because acc pl fem of 3D are short).
 
 #2D
 Nom and acc pl (neut): => short α (the only dichronon; Same as neuter pl 3D.)
@@ -42,7 +43,10 @@ then let breve = f"^{ordinal_last_vowel(token)}"
 '''
 
 import warnings
-import grc_odycy_joint_trf
+import grc_odycy_joint_trf # type: ignore
+from db.ionic import ionic
+
+from grc_utils import only_bases
 
 warnings.filterwarnings('ignore', category=FutureWarning)
 
@@ -54,23 +58,55 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 nlp = grc_odycy_joint_trf.load()
 
 def macronize_nominal_forms(word):
+
+    word = word.strip('^').strip('_')
     doc = nlp(word)
 
     lemma = None
     pos = None
     morph = None
 
-    for token in doc:
+    for token in doc: # makes sure we don't accidentally get several words
         lemma = token.lemma_
         pos = token.pos_
         morph = token.morph
 
-    def long_acc_pl_fem(word, lemma, pos, morph):
-        '''
-        for nouns in accusative plural feminine and lemma ending with η or α, 
-        ending -ας is long.
-        E.g. ἐπιθυμίας
-        '''
         if pos != "NOUN":
             return None
+
+    def first_declination(word, lemma, morph):
+        '''
+        Nominal-form algorithms for 1st declension endings.
+        '''
+
+        # -α_ for 1D nouns in nominative/vocative singular feminine
+        if only_bases(word)[-1:] == "α" and word == lemma and morph.get("Case") in ["Nom", "Voc"] and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+            etacist_version = word[:-1] + "η"
+            if any(etacist_version[:-1] == ionic_word[:-1] and etacist_version[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
+                return word + "_"
+
+        # -α_ν for 1D nouns in accusative singular feminine
+        elif only_bases(word)[-2:] == "αν" and morph.get("Case") == "Acc" and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+            if lemma[-1] in ["η", "α"]:
+                etacist_lemma = lemma[:-1] + "η"
+                if any(etacist_lemma[:-1] == ionic_word[:-1] and etacist_lemma[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
+                    return word + "_"
+
+        # -α_ς for 1D nouns in genitive singular feminine
+        elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Gen" and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+            return word[:-1] + "_" + word[-1]
         
+        # -α_ς for 1D nouns in accusative plural feminine
+        elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Acc" and morph.get("Number") == "Pl" and morph.get("Gender") == "Fem":
+            if lemma[-1] in ["η", "α"]:
+                # Insert a macron (_) between the last two characters of the word
+                return word[:-1] + "_" + word[-1]
+        
+        return None
+
+    # Call the first_declination function
+    result = first_declination(word, lemma, morph)
+    if result:
+        return result
+    
+    return word

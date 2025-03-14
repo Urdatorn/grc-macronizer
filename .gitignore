@@ -1,4 +1,7 @@
+# pycache
 /__pycache__
+/db/__pycache__
+
 /wiktionary_htmls
 /temp
 format_anabasis.ipynb
