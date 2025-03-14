@@ -88,14 +88,14 @@ def macronize_nominal_forms(word):
         '''
 
         # -α_ for 1D nouns in nominative/vocative singular feminine
-        if only_bases(word)[-1:] == "α" and word == lemma and morph.get("Case") in ["Nom", "Voc"] and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+        if only_bases(word)[-1:] == "α" and word == lemma and ('Nom' in morph.get("Case") or 'Voc' in morph.get("Case")) and 'Sing' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             etacist_version = word[:-1] + "η"
             if any(etacist_version[:-1] == ionic_word[:-1] and etacist_version[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
                 print(f'{word}: 1D case 1')
                 return word + "_"
 
         # -α_ν for 1D nouns in accusative singular feminine
-        elif only_bases(word)[-2:] == "αν" and morph.get("Case") == "Acc" and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+        elif only_bases(word)[-2:] == "αν" and 'Acc' in morph.get("Case") and 'Sing' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             if lemma[-1] in ["η", "α"]:
                 etacist_lemma = lemma[:-1] + "η"
                 if any(etacist_lemma[:-1] == ionic_word[:-1] and etacist_lemma[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
@@ -103,12 +103,12 @@ def macronize_nominal_forms(word):
                     return word + "_"
 
         # -α_ς for 1D nouns in genitive singular feminine
-        elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Gen" and morph.get("Number") == "Sing" and morph.get("Gender") == "Fem":
+        elif only_bases(word)[-2:] == "ας" and 'Gen' in morph.get("Case") and 'Sing' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             print(f'{word}: 1D case 3')
             return word[:-1] + "_" + word[-1]
         
         # -α_ς for 1D nouns in accusative plural feminine
-        elif only_bases(word)[-2:] == "ας" and morph.get("Case") == "Acc" and morph.get("Number") == "Pl" and morph.get("Gender") == "Fem":
+        elif only_bases(word)[-2:] == "ας" and 'Acc' in morph.get("Case") and 'Plur' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             if lemma[-1] in ["η", "α"]:
                 print(f'{word}: 1D case 4')
                 return word[:-1] + "_" + word[-1]
@@ -116,14 +116,37 @@ def macronize_nominal_forms(word):
         return None
     
     def masc_and_neutre_short_alpha(word, morph):
-        if only_bases(word)[-1:] == "α" and morph.get("Gender") in ["Masc", "Neut"]:
+        if only_bases(word)[-1:] == "α" and ('Masc' in morph.get("Gender") or 'Neut' in morph.get("Gender")):
             print(f'{word}: Masc/Neut short alpha')
             return word + "^"
         
         return None
     
+    def dative_short_iota(word, morph):
+        '''
+        Note optional ny ephelkystikon!
+        '''
+        if 'Dat' in morph.get("Case"):  # Check if 'Dat' is in the list
+            if only_bases(word)[-1:] == "ι":
+                print(f'{word}: Dat short iota')
+                return word + "^"
+            elif only_bases(word)[-2:] == "ιν":
+                print(f'{word}: Dat short iota')
+                return word[:-1] + "^" + word[-1]
+        return None
+    
     # Call the first_declination function
     result = first_declination(word, lemma, morph)
+    if result:
+        return result
+    
+    # Call the masc_and_neutre_short_alpha function
+    result = masc_and_neutre_short_alpha(word, morph)
+    if result:
+        return result
+    
+    # Call the dative_short_iota function
+    result = dative_short_iota(word, morph)
     if result:
         return result
     
@@ -134,3 +157,6 @@ def macronize_nominal_forms(word):
 input = "κιθάρα"
 input = "μάχαιρα"
 print(macronize_nominal_forms(input))
+
+input = "γυναιξί" #γυναιξί: γυνή, NOUN, Case=Dat|Gender=Fem|Number=Plur; why is it not returning γυναιξί^?
+print(macronize_nominal_forms(input)) # output = input. fuck
