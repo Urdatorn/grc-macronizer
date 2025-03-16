@@ -1,11 +1,14 @@
-# pycache
-/__pycache__
-/db/__pycache__
-
-/wiktionary_htmls
-/temp
-format_anabasis.ipynb
-sandbox.ipynb
+# ignore all pycache and pytest_cache dirs at all depths (note the slash to  the right)
+__pycache__/
+.pytest_cache/
 
 # Mac OS
 .DS_Store
+
+# temp
+temp/
+
+# other
+format_anabasis.ipynb
+sandbox.ipynb
+

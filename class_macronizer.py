@@ -8,6 +8,7 @@ from epic_stop_words import epic_stop_words
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
+from nominal_forms import macronize_nominal_forms
 
 def check_word(word):
     return not has_ambiguous_dichrona_in_open_syllables(word)
@@ -18,8 +19,6 @@ def get_words(text):
             return [word for word in words if any(vowel(char) for char in word)] # extra precaution: all grc words have vowels
 
 class Macronizer:
-    """A class to handle macronization of Greek text using databases."""
-    
     def __init__(self, 
                  genre='prose',
                  macronize_everything=True,
@@ -28,7 +27,8 @@ class Macronizer:
                  wiktionary_db_file='db/grc_macrons.db', 
                  hypotactic_db_file='db/hypotactic.db', 
                  aristophanes_db_file=None, 
-                 custom_db_file=None):
+                 custom_db_file=None,
+                 debug=False):
 
         self.genre = genre
         self.macronize_everything = macronize_everything
@@ -38,8 +38,8 @@ class Macronizer:
         self.hypotactic_db_file = hypotactic_db_file
         self.aristophanes_db_file = aristophanes_db_file
         self.custom_db_file = custom_db_file
-
         self.wiktionary_map = {}
+        self.debug = debug
         try:
             conn = sqlite3.connect(self.wiktionary_db_file)
             cursor = conn.cursor()
@@ -106,18 +106,10 @@ class Macronizer:
         to its macronized form(s). If no matches are found, returns the original word.
         If no match is found and the input ends with a grave accent, tries with acute.
         
-        Args:
-            words (list): List of words to macronize
-            
-        Returns:
-            dict: Mapping of original words to their macronized forms
+        TODO: self.genre == 'epic' should be a stop list of words that should not be macronized and should be returned as is
         """
         results = {}
 
-        if self.genre == 'epic':
-            for word in words:
-                if word in epic_stop_words:
-                    results[word] = word
         for original_word in tqdm(words, desc="Querying Wiktionary", unit="word", leave=False):
             # Try Wiktionary lookup first
             wikt_result = self.wiktionary(original_word)
@@ -176,6 +168,8 @@ class Macronizer:
         # Split into tokens
         tokens = re.findall(r'\w+|[^\w\s]+|\s+', text)
         words = [t for t in tokens if re.match(r'^\w+$', t)]
+        if self.debug:
+            print(f"Token list: {words}")
 
         # Macronize the words
         macronized_map = self.macronize(words)
@@ -285,4 +279,6 @@ class Macronizer:
 
         merged = merge_or_overwrite_markup(new_version, old_version)
         return merged
+    
 
+        

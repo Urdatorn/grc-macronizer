@@ -9,18 +9,6 @@ from grc_utils import macrons_map, normalize_word
 SHORT = '̆'
 LONG = '̄'
 
-
-def strip_length_string(string):
-    '''
-    Strips the input string of all length diacritics using the macrons_map dictionary.
-    >>> strip_length_string('ᾰᾸᾱᾹῐῘῑῙῠῨῡῩᾰ̓Ᾰ̓ᾰ̔Ᾰ̔ᾰ́ᾰ̀ᾱ̓Ᾱ̓ᾱ̔Ᾱ̔ᾱ́ᾱ̀ᾱͅῐ̓Ῐ̓ῐ̔Ῐ̔ῐ́ῐ̀ῐ̈ῑ̓Ῑ̓ῑ̔Ῑ̔ῑ́ῑ̈ῠ̓ῠ̔Ῠ̔ῠ́ῠ̀ῠ͂ῠ̈ῠ̒ῡ̔Ῡ̔ῡ́ῡ̈')
-    >>> αΑαΑιΙιΙυΥυΥἀἈἁἉάὰἀἈἁἉάὰᾳἰἸἱἹίὶϊἰἸἱἹίϊὐὑὙύὺῦϋυ̒ὑὙύϋ
-    '''
-    for composite, replacement in macrons_map.items():
-        string = string.replace(composite, replacement)
-    return string
-
-
 def macron_unicode_to_markup(text):
     '''
     >>> macron_unicode_to_markup('νεᾱνῐ́ᾱς')
@@ -49,9 +37,9 @@ def macron_unicode_to_markup(text):
             while i < len(decomposed) and unicodedata.category(decomposed[i]).startswith('M'):
                 mark = decomposed[i]
                 # Step 4: Classify the mark
-                if mark == '̄':  # Macron (long)
+                if mark == LONG:  # Macron
                     length_marker = '_'
-                elif mark == '̆':  # Breve (short)
+                elif mark == SHORT:  # Breve
                     length_marker = '^'
                 else:
                     diacritics += mark  # Keep other diacritics (e.g., acute)

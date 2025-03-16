@@ -51,22 +51,16 @@ The following have nominal forms in grc:
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
 '''
 
-import warnings
-import grc_odycy_joint_trf # type: ignore
 from db.ionic import ionic
-
 from grc_utils import only_bases
-
-warnings.filterwarnings('ignore', category=FutureWarning)
 
 ### THE 3 ALGORITHMS RE NOMINAL FORMS
 # long_fem_alpha(token, tag, lemma)
 # short_masc_neut_alpha(token, tag)
 # short_dat(token, tag)
 
-nlp = grc_odycy_joint_trf.load()
 
-def macronize_nominal_forms(word, debug=False):
+def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
     '''
     This function should only be called if ultima or penultima is not yet macronized.
     It is slow and because of its complexity, bug prone.
@@ -74,27 +68,15 @@ def macronize_nominal_forms(word, debug=False):
     It is primarily useful for *oxytones*.
     '''
 
-    word = word.strip('^').strip('_')
-    doc = nlp(word)
-
-    lemma = None
-    pos = None
-    morph = None
-
-    for token in doc: # makes sure we don't accidentally get several words
-        if token.lemma_ and token.pos_ and token.morph:
-            lemma = token.lemma_
-            pos = token.pos_
-            morph = token.morph
-        else: 
-            return None
+    if not word or not lemma or not pos or not morph:
+        return word
 
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
 
     if pos not in nominal_pos_tags or (morph is not None and "Dual" in morph.get("Number", [])):
         if debug:
             print(f"{word} is {pos} which is not NOUN or ADJ; or is DUAL")
-        return None
+        return word
 
     if debug:
         print(f'odyCy on {word}: \n\tLemma {lemma}, \n\tPOS: {pos}, \n\tMorphology: {morph}')
@@ -144,7 +126,7 @@ def macronize_nominal_forms(word, debug=False):
                 return word[:-1] + "_" + word[-1]
         
         else:
-            return None
+            return word
     
     def masc_and_neutre_short_alpha(word, morph):
         if only_bases(word)[-1:] == "α" and ('Masc' in morph.get("Gender") or 'Neut' in morph.get("Gender")):
@@ -152,13 +134,13 @@ def macronize_nominal_forms(word, debug=False):
                 print(f'\033[1;32m{word}: Masc/Neut short alpha\033[0m')
             return word + "^"
         
-        return None
+        return word
     
     def dative_short_iota(word, morph):
         '''
         Note optional ny ephelkystikon!
         '''
-        if 'Dat' in morph.get("Case"):  # Check if 'Dat' is in the list
+        if 'Dat' in morph.get("Case"):
             if only_bases(word)[-1:] == "ι":
                 if debug:
                     print(f'\033[1;32m{word}: Dat short iota\033[0m')
@@ -167,7 +149,7 @@ def macronize_nominal_forms(word, debug=False):
                 if debug:
                     print(f'\033[1;32m{word}: Dat short iota (with ny ephelkystikon)\033[0m')
                 return word[:-1] + "^" + word[-1]
-        return None
+        return word
     
     # Call the first_declination function
     result = first_declination(word, lemma, morph)
@@ -191,33 +173,33 @@ def macronize_nominal_forms(word, debug=False):
 # NB: Uncomment after every change to macronize_nominal_forms
 #
 
-# (1) -α_ for 1D nouns in nominative/vocative singular feminine
-input = "κιθάρα"
-assert macronize_nominal_forms(input, debug=True) == "κιθάρα_"
+# # (1) -α_ for 1D nouns in nominative/vocative singular feminine
+# input = "κιθάρα"
+# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_"
 
-# (2) -α_ν for 1D nouns in accusative singular feminine
-input = "κιθάραν"
-assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ν"
+# # (2) -α_ν for 1D nouns in accusative singular feminine
+# input = "κιθάραν"
+# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ν"
 
-# (3) -α_ς for 1D nouns in genitive singular feminine
-input = "κιθάρας"
-assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ς"
+# # (3) -α_ς for 1D nouns in genitive singular feminine
+# input = "κιθάρας"
+# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ς"
 
-# (4) nouns in accusative plural feminine, and lemma ending with η or α, ending -ας is long
-input = "καλάς"
-assert macronize_nominal_forms(input, debug=True) == "καλά_ς"
+# # (4) nouns in accusative plural feminine, and lemma ending with η or α, ending -ας is long
+# input = "καλάς"
+# assert macronize_nominal_forms(input, debug=True) == "καλά_ς"
 
-# (5) for all masculine and neutre nouns, the ending -α is short
-input = "ὁπλίτα"
-assert macronize_nominal_forms(input, debug=True) == "ὁπλίτα^" 
+# # (5) for all masculine and neutre nouns, the ending -α is short
+# input = "ὁπλίτα"
+# assert macronize_nominal_forms(input, debug=True) == "ὁπλίτα^" 
 
-# (6) for all datives, the ending -ι is short
-input = "γυναιξί"
-assert macronize_nominal_forms(input, debug=True) == "γυναιξί^"
+# # (6) for all datives, the ending -ι is short
+# input = "γυναιξί"
+# assert macronize_nominal_forms(input, debug=True) == "γυναιξί^"
 
-input = "γυναιξίν"
-assert macronize_nominal_forms(input, debug=True) == "γυναιξί^ν"
+# input = "γυναιξίν"
+# assert macronize_nominal_forms(input, debug=True) == "γυναιξί^ν"
 
-# (Extra) No duals
-input = "χεροῖν"
-assert macronize_nominal_forms(input, debug=True) == None
+# # (Extra) No duals
+# input = "χεροῖν"
+# assert macronize_nominal_forms(input, debug=True) == None
