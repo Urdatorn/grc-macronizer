@@ -42,7 +42,7 @@ class Text:
                 print(f"{i}: {sentence}")
 
         # odyCy tokenization
-        hash_value = xxhash.xxh3_64_hexdigest("text")
+        hash_value = xxhash.xxh3_64_hexdigest(text)
         if debug:
             print(f"Hash value: {hash_value}")
         output_file_name = f"odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
