@@ -65,7 +65,8 @@ class Text:
         for doc in docs: # don't worry, pipe() returns docs in the right order
             for token in doc:
                 if token.orth_ and token.lemma_ and token.pos_ and token.morph:
-                    macronized_nominal_forms.append(macronize_nominal_forms(token.orth_, token.lemma_, token.pos_, token.morph, debug=False))
+                    orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
+                    macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
         self.text = text
         self.docs = docs
@@ -86,41 +87,49 @@ class Text:
         Raises:
             ValueError: If a macronized word cannot be found in the original text.
         """
-
-
         result_text = self.text
         macronized_words = [word for word in self.macronized_words if word is not None and any(macron in word for macron in ['_', '^'])]
         
         word_counts = {}
         
-
-        for macronized_word in tqdm(macronized_words, desc="Integrating macronized words"):
-
-            search_copy = self.text
-            match_counter = 0 # counts regex matches; must be reset for each macronized_word
+        # Build a list of all replacements we need to make
+        replacements = []
         
-            def replace_nth(match):
-                """Only replace when count reaches current_count + 1"""
-                nonlocal match_counter # use nonlocal for variables inside nested functions 
-                match_counter += 1
-                print(f"Match counter: {match_counter}")
-                return macronized_word if match_counter == current_count + 1 else match.group(0)
-
+        for macronized_word in tqdm(macronized_words, desc="Finding replacements"):
             normalized_word = normalize_word(macronized_word.replace('_', '').replace('^', ''))
-            normalized_word = make_only_greek(normalized_word)
+            #normalized_word = make_only_greek(normalized_word)
             
             if not normalized_word:
                 continue
             
-            current_count = word_counts.get(normalized_word, 0) # default to 0
+            current_count = word_counts.get(normalized_word, 0)  # default to 0
             
             if self.debug:
-                print(f"Integrating: {macronized_word} (Current count: {current_count})")
+                print(f"Processing: {macronized_word} (Current count: {current_count})")
             
-            result_text = re.sub(fr"\b{normalized_word}\b", replace_nth, result_text)
+            # Find all matches in the original text
+            matches = list(re.finditer(fr"\b{normalized_word}\b", self.text))
+            
+            if current_count >= len(matches):
+                raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
+                
+            # Get the position and length of the target occurrence
+            target_match = matches[current_count]
+            start_pos = target_match.start()
+            end_pos = target_match.end()
+            
+            # Store the replacement information
+            replacements.append((start_pos, end_pos, macronized_word))
             
             word_counts[normalized_word] = current_count + 1
         
+        # Sort replacements by position (to apply them from end to beginning)
+        replacements.sort(reverse=True, key=lambda x: x[0])
+        
+        # Apply all replacements (from end to beginning to avoid position shifts)
+        for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements"):
+            result_text = result_text[:start_pos] + replacement + result_text[end_pos:]
+            
         # Save the result
         self.macronized_text = result_text
         
@@ -149,10 +158,10 @@ class Text:
 
 if __name__ == "__main__":
     input = "ἔχω κιθάρας ἀγαθάς. νεανίας δ' εἰμὶ ἀάατος. κιθάρας ἀγαθάς ἔχω."
-    #input = anabasis
+    input = anabasis
     text = Text(input, doc_from_file=True, debug=True)
-    print(text.macronized_nominal_forms)
+    #print(text.macronized_nominal_forms)
     
     # Test the integrate method
     text.macronized_text = text.integrate()
-    print("Macronized text:", text.macronized_text)
+    #print("Macronized text:", text.macronized_text)
