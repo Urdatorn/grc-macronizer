@@ -9,6 +9,7 @@ import warnings
 import re
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+from epic_stop_words import epic_stop_words
 from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
 from format_macrons import merge_or_overwrite_markup
@@ -16,9 +17,6 @@ from grc_utils import normalize_word, make_only_greek
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf # type: ignore
-
-
-
 
 class Text:
     '''
@@ -32,9 +30,12 @@ class Text:
 
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
-    def __init__(self, text, doc_from_file=True, debug=False):
+    def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
 
-        before_odycy = text.strip('^').strip('_') # first remove previous markup if doing a "second run"
+        to_remove = {'^', '_', '<', '>', '[', ']', '«', '»', '†'}
+        translation_table = str.maketrans("", "", "".join(to_remove))
+        before_odycy = text.translate(translation_table)
+
         sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
             print(f'Split input into {len(sentence_list)} sentences.')
@@ -42,7 +43,7 @@ class Text:
                 print(f"{i}: {sentence}")
 
         # odyCy tokenization
-        hash_value = xxhash.xxh3_64_hexdigest(text)
+        hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             print(f"Hash value: {hash_value}")
         output_file_name = f"odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
@@ -60,18 +61,28 @@ class Text:
             print(f"Saving odyCy doc bin to disc as {output_file_name}")
             doc_bin.to_disk(output_file_name)
 
-        
+        token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
         for doc in docs: # don't worry, pipe() returns docs in the right order
             for token in doc:
                 if token.orth_ and token.lemma_ and token.pos_ and token.morph:
                     orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
+                    if genre == 'epic':
+                        if orth in epic_stop_words:
+                            continue
+                    token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
                     macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
         self.text = text
+        self.genre = genre
         self.docs = docs
+        self.token_lemma_pos_morph = token_lemma_pos_morph
         self.macronized_nominal_forms = macronized_nominal_forms
-        self.macronized_words = macronized_nominal_forms # for now; this will contain the results of merging macronized_nominal_forms with the results of all other macronization methods
+        self.macronized_words = [] # for now; this will contain the results of merging macronized_nominal_forms with the results of all other macronization methods
+        for sublist, macronized_nominal_form in zip(token_lemma_pos_morph, macronized_nominal_forms):
+            token = sublist[0]
+            merge = merge_or_overwrite_markup(token, macronized_nominal_form)
+            self.macronized_words.append(merge)
         self.macronized_text = ''
         self.debug = debug
 
@@ -130,7 +141,6 @@ class Text:
         for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements"):
             result_text = result_text[:start_pos] + replacement + result_text[end_pos:]
             
-        # Save the result
         self.macronized_text = result_text
         
         # Verify that only macrons have been changed
@@ -165,3 +175,10 @@ if __name__ == "__main__":
     # Test the integrate method
     text.macronized_text = text.integrate()
     #print("Macronized text:", text.macronized_text)
+    length_of_docs = 0
+    for doc in text.docs:
+        for token in doc:
+            length_of_docs += 1
+
+    print(f'Len of docs: {length_of_docs}')
+    print(f'Len of macronized_words: {len(text.macronized_words)}')

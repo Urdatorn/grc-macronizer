@@ -4,6 +4,7 @@ import time
 from tqdm import tqdm
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
+from class_text import Text
 from epic_stop_words import epic_stop_words
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
@@ -20,7 +21,6 @@ def get_words(text):
 
 class Macronizer:
     def __init__(self, 
-                 genre='prose',
                  macronize_everything=True,
                  unicode=False,
                  ifeellucky=True,
@@ -30,7 +30,6 @@ class Macronizer:
                  custom_db_file=None,
                  debug=False):
 
-        self.genre = genre
         self.macronize_everything = macronize_everything
         self.unicode = unicode
         self.ifeellucky = ifeellucky
