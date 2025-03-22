@@ -10,6 +10,7 @@ from format_macrons import macron_integrate_markup, macron_markup_to_unicode, ma
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
 from nominal_forms import macronize_nominal_forms
+from db.wiktionary import wiktionary_map
 
 def check_word(word):
     return not has_ambiguous_dichrona_in_open_syllables(word)
@@ -24,7 +25,6 @@ class Macronizer:
                  macronize_everything=True,
                  unicode=False,
                  ifeellucky=True,
-                 wiktionary_db_file='db/grc_macrons.db', 
                  hypotactic_db_file='db/hypotactic.db', 
                  aristophanes_db_file=None, 
                  custom_db_file=None,
@@ -33,25 +33,12 @@ class Macronizer:
         self.macronize_everything = macronize_everything
         self.unicode = unicode
         self.ifeellucky = ifeellucky
-        self.wiktionary_db_file = wiktionary_db_file
         self.hypotactic_db_file = hypotactic_db_file
         self.aristophanes_db_file = aristophanes_db_file
         self.custom_db_file = custom_db_file
-        self.wiktionary_map = {}
         self.debug = debug
-        try:
-            conn = sqlite3.connect(self.wiktionary_db_file)
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT word FROM macrons")
-            rows = cursor.fetchall()
-            conn.close()
 
-            for row in rows:
-                db_word = row[0]
-                normalized_word = normalize_word(no_macrons(db_word))
-                self.wiktionary_map.setdefault(normalized_word, []).append(db_word)
-        except sqlite3.Error as e:
-            print(f"Warning: Could not load wiktionary database: {e}")
+        self.wiktionary_map = wiktionary_map
 
         self.hypotactic_map = {}
         try:
@@ -68,18 +55,11 @@ class Macronizer:
             
     def wiktionary(self, word):
         """
-        Looks up a word in the Wiktionary database and returns its macronized form(s).
-        
-        Args:
-            word (str): Word to look up
-            
-        Returns:
-            str or list: Macronized form(s) of the word if found, None if not found
+        Should return with macron_unicode_to_markup
         """
-        nw = normalize_word(no_macrons(word))
+        word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
         
-        # Look up the word in the pre-loaded map
-        matches = self.wiktionary_map.get(nw, [])
+        matches = self.wiktionary_map.get(word, [])
         if len(matches) == 1:
             return matches[0]
         elif len(matches) > 1:
@@ -99,91 +79,55 @@ class Macronizer:
             return macron_integrate_markup(word, macrons)
         return word
 
-    def macronize(self, words):
+    def macronize(self, text, genre='prose'):
         """
-        Takes a list of words and returns a dictionary mapping each original word
-        to its macronized form(s). If no matches are found, returns the original word.
-        If no match is found and the input ends with a grave accent, tries with acute.
-        
-        TODO: self.genre == 'epic' should be a stop list of words that should not be macronized and should be returned as is
+        Macronization is a modular and recursive process comprised of the following operations: 
+            [wiktionary]
+            [hypotactic]
+            [nominal forms]
+            [accent rules]
+            [lemma-based generalization]
+        Accent rules and (naturally) lemma-based generalization are the only modules that rely on the output of the other modules for optimal performance.
+        My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
-        results = {}
 
-        for original_word in tqdm(words, desc="Querying Wiktionary", unit="word", leave=False):
-            # Try Wiktionary lookup first
-            wikt_result = self.wiktionary(original_word)
-            if wikt_result is not None:
-                results[original_word] = wikt_result
-                continue
-                
-            # Try replacing grave with acute if no matches
-            if original_word and any(char in grave_to_acute for char in original_word):
-                modified_word = replace_grave_with_acute(original_word)
-                wikt_result = self.wiktionary(modified_word)
-                if wikt_result is not None:
-                    if isinstance(wikt_result, list):
-                        results[original_word] = [replace_acute_with_grave(word) for word in wikt_result] # work in progress; this should pipe to a POS disambiguator
-                    else:
-                        results[original_word] = replace_acute_with_grave(wikt_result)
-                    continue
-            # Try hypotactic db if grave-acute doesn't help
-            elif self.hypotactic(original_word) != original_word:
-                results[original_word] = self.hypotactic(original_word)
-                continue
-            # If still no matches, return original word
-            else:
-                results[original_word] = original_word
-        
-        # Finally, apply accent rules
-        if self.macronize_everything:
-            results = {k: self.apply_accentuation_rules(v) for k, v in results.items()} # applied to v to make use of disambiguated dichronic ultima and penultima
+        text = Text(text, genre, doc_from_file=True, debug=self.debug)
+        token_lemma_pos_morph = text.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
+            
+        def macronization_modules(token, lemma, pos, morph, is_lemma=False):
+            second_pass = False
 
-        if self.unicode:
-            # Optional: convert to Unicode format
-            return {k: macron_markup_to_unicode(v) for k, v in results.items()}
-        
-        # Normalize to markup format
-        return {k: macron_unicode_to_markup(v) for k, v in results.items()}
+            wiktionary_token = self.wiktionary(token, lemma, pos, morph)
+            hypotactic_token = self.hypotactic(token)
 
-    def macronize_text(self, text):
-        """
-        Takes a string and macronizes words while preserving punctuation and whitespace.
-        
-        Args:
-            text (str): Input text to macronize
-        
-        Returns:
-            str: Macronized text with original formatting preserved
-        """
-        start_time = time.perf_counter()
+            macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
+            accent_rules_token = self.apply_accentuation_rules(macronized_token)
+            
+            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
 
-        # Check if there's whitespace in the text
-        if not re.search(r'\s', text):
-            single_result = self.macronize([text])
-            if single_result and text in single_result:
-                return single_result[text]
-            return text
-        
-        # Split into tokens
-        tokens = re.findall(r'\w+|[^\w\s]+|\s+', text)
-        words = [t for t in tokens if re.match(r'^\w+$', t)]
-        if self.debug:
-            print(f"Token list: {words}")
+            # ἴθε δή, let's recursively macronize remaining dichrona
+            dichrona_remaining = 0
+            if count_dichrona_in_open_syllables(macronized_token) > 0:
+                if not second_pass:
+                    second_pass = True
+                    oxytonized_token = replace_grave_with_acute(macronized_token)
+                    oxytonized_token = macronization_modules(oxytonized_token, lemma, pos, morph)
+                    macronized_token = merge_or_overwrite_markup(oxytonized_token, macronized_token)
+                    
+                if not is_lemma:
+                    lemma_token = macronization_modules(macronized_token, lemma, pos, morph, is_lemma=True)
+                    macronized_token = self.lemma_generalization(macronized_token, lemma_token)
 
-        # Macronize the words
-        macronized_map = self.macronize(words)
+            return macronized_token
 
-        # Replace original words with macronized versions
-        word_iter = iter(words)
-        for i, token in enumerate(tokens):
-            if re.match(r'^\w+$', token):
-                original_word = next(word_iter)
-                tokens[i] = macronized_map.get(original_word, original_word)
+        macronized_tokens = []
+        for token, lemma, pos, morph in token_lemma_pos_morph:
+            macronized_tokens.append(macronization_modules(token, lemma, pos, morph))
 
-        end_time = time.perf_counter()
-        print(f"\nMacronization took {end_time - start_time:.2f} seconds")
+        text.macronized_words = macronized_tokens
+        text.integrate()
 
-        return "".join(tokens)
+        return text.macronized_text
     
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
         def remove_proper_names(text):
@@ -280,4 +224,9 @@ class Macronizer:
         return merged
     
 
-        
+    def lemma_generalization(macronized_token, lemma_token):
+        """
+        Take a deep breath and focus. 
+        This is probably the one module with the greatest potential for optimization, given enough ingenuity.
+        """
+        pass

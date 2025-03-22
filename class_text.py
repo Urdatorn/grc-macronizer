@@ -1,7 +1,3 @@
-'''
-i want a new Text method integrate(self) that takes the word list self.macronized_words that contains a list of words form self.text, and for each macronized_word in the list it chronologically searches for the n+1:th text_word such that macronized_word.strip('_').strip('^') == text_word.strip('_').strip('^') (where is is the number of times macronized_word.strip('_').strip('^') has already been searched for; this ensures chronological one-to-one proceedure) , and then substitutes in merge_or_overwrite_markup(macronized_word, text_word) for text.word. at the end, the resulting new text is saved as self.macronized_text. Note (1): every search is expected to go through; if a single does not, raise error. Note (2): at the very end we need to assert that self.text == self.macronized_text to make sure nothing got corrupted and no changes except carets and underscores were undergone
-'''
-
 import os
 from tqdm import tqdm
 import xxhash
@@ -16,7 +12,7 @@ from format_macrons import merge_or_overwrite_markup
 from grc_utils import normalize_word, make_only_greek
 
 from spacy.tokens import DocBin
-import grc_odycy_joint_trf # type: ignore
+import grc_odycy_joint_trf
 
 class Text:
     '''
@@ -79,10 +75,10 @@ class Text:
         self.token_lemma_pos_morph = token_lemma_pos_morph
         self.macronized_nominal_forms = macronized_nominal_forms
         self.macronized_words = [] # for now; this will contain the results of merging macronized_nominal_forms with the results of all other macronization methods
-        for sublist, macronized_nominal_form in zip(token_lemma_pos_morph, macronized_nominal_forms):
-            token = sublist[0]
-            merge = merge_or_overwrite_markup(token, macronized_nominal_form)
-            self.macronized_words.append(merge)
+        # for sublist, macronized_nominal_form in zip(token_lemma_pos_morph, macronized_nominal_forms):
+        #     token = sublist[0]
+        #     merge = merge_or_overwrite_markup(token, macronized_nominal_form)
+        #     self.macronized_words.append(merge)
         self.macronized_text = ''
         self.debug = debug
 
