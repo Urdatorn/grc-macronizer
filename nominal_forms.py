@@ -173,33 +173,95 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
 # NB: Uncomment after every change to macronize_nominal_forms
 #
 
-# # (1) -α_ for 1D nouns in nominative/vocative singular feminine
-# input = "κιθάρα"
-# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_"
+if __name__ == "__main__":
+    print("Running asserts for macronize_nominal_forms...")
 
-# # (2) -α_ν for 1D nouns in accusative singular feminine
-# input = "κιθάραν"
-# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ν"
+    import warnings
+    import grc_odycy_joint_trf
 
-# # (3) -α_ς for 1D nouns in genitive singular feminine
-# input = "κιθάρας"
-# assert macronize_nominal_forms(input, debug=True) == "κιθάρα_ς"
+    warnings.filterwarnings('ignore', category=FutureWarning)
 
-# # (4) nouns in accusative plural feminine, and lemma ending with η or α, ending -ας is long
-# input = "καλάς"
-# assert macronize_nominal_forms(input, debug=True) == "καλά_ς"
+    nlp = grc_odycy_joint_trf.load()
 
-# # (5) for all masculine and neutre nouns, the ending -α is short
-# input = "ὁπλίτα"
-# assert macronize_nominal_forms(input, debug=True) == "ὁπλίτα^" 
+    try:
+        # (1) -α_ for 1D nouns in nominative/vocative singular feminine
+        output = nlp("κιθάρα")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
 
-# # (6) for all datives, the ending -ι is short
-# input = "γυναιξί"
-# assert macronize_nominal_forms(input, debug=True) == "γυναιξί^"
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "κιθάρα_"
 
-# input = "γυναιξίν"
-# assert macronize_nominal_forms(input, debug=True) == "γυναιξί^ν"
+        # (2) -α_ν for 1D nouns in accusative singular feminine
+        output = nlp("κιθάραν")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+        
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "κιθάρα_ν"
 
-# # (Extra) No duals
-# input = "χεροῖν"
-# assert macronize_nominal_forms(input, debug=True) == None
+        # (3) -α_ς for 1D nouns in genitive singular feminine
+        output = nlp("κιθάρας")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "κιθάρα_ς"
+
+        # (4) nouns in accusative plural feminine, and lemma ending with η or α, ending -ας is long
+        output = nlp("καλάς")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "καλά_ς"
+
+        # (5) for all masculine and neutre nouns, the ending -α is short
+        output = nlp("ὁπλίτα")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        #assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "ὁπλίτα^" 
+
+        # (6) for all datives, the ending -ι is short
+        output = nlp("γυναιξί")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "γυναιξί^"
+
+        output = nlp("γυναιξίν")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "γυναιξί^ν"
+
+        # (Extra) No duals
+        output = nlp("χεροῖν")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == None
+
+    except AssertionError:
+        print(f"Assertion failed for input: {input}")

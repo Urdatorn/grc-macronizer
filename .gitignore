@@ -8,8 +8,12 @@ __pycache__/
 # temp
 temp/
 
-# other
+# behind-the-scenes stuff
 format_anabasis.ipynb
 sandbox.ipynb
+odycy.ipynb
 
+# unused db
+db/grc_macrons.db
+db/wiktionary_old.py
 db/grc_macrons.db

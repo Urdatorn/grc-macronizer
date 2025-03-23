@@ -2,6 +2,7 @@ import re
 import sqlite3
 import time
 from tqdm import tqdm
+from greek_accentuation.syllabify import add_necessary_breathing
 
 from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
 from class_text import Text
@@ -9,22 +10,13 @@ from epic_stop_words import epic_stop_words
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
-from nominal_forms import macronize_nominal_forms
-from db.wiktionary import wiktionary_map
-
-def check_word(word):
-    return not has_ambiguous_dichrona_in_open_syllables(word)
-
-def get_words(text):
-            text = normalize_word(text) # combining diacritics will cause splits without this
-            words = re.findall(r'[\w^_]+', text) # remember that we are now acting on integrated markup with carets and underscores
-            return [word for word in words if any(vowel(char) for char in word)] # extra precaution: all grc words have vowels
+from morph_disambiguator import morph_disambiguator
+from db.wiktionary_singletons import wiktionary_map
 
 class Macronizer:
     def __init__(self, 
                  macronize_everything=True,
                  unicode=False,
-                 ifeellucky=True,
                  hypotactic_db_file='db/hypotactic.db', 
                  aristophanes_db_file=None, 
                  custom_db_file=None,
@@ -32,13 +24,13 @@ class Macronizer:
 
         self.macronize_everything = macronize_everything
         self.unicode = unicode
-        self.ifeellucky = ifeellucky
+        self.wiktionary_map = wiktionary_map
         self.hypotactic_db_file = hypotactic_db_file
         self.aristophanes_db_file = aristophanes_db_file
         self.custom_db_file = custom_db_file
         self.debug = debug
 
-        self.wiktionary_map = wiktionary_map
+        
 
         self.hypotactic_map = {}
         try:
@@ -53,21 +45,20 @@ class Macronizer:
         except sqlite3.Error as e:
             print(f"Warning: Could not load hypotactic database: {e}")
             
-    def wiktionary(self, word):
+    def wiktionary(self, word, lemma, pos, morph):
         """
         Should return with macron_unicode_to_markup
         """
         word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
         
-        matches = self.wiktionary_map.get(word, [])
-        if len(matches) == 1:
-            return matches[0]
-        elif len(matches) > 1:
-            if self.ifeellucky:
-                return matches[0]
-            else:
-                return matches # work in progress; this should pipe to a POS disambiguator
-        return None
+        match = self.wiktionary_map[word] # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
+        if len(match[0]) == 1: # if only one macronization present
+            return macron_unicode_to_markup(match[0][0])
+        elif len(match) > 1:
+            disambiguated = morph_disambiguator(word, lemma, pos, morph, match[0], match[1], match[2], match[3], match[4], match[5])
+            return macron_unicode_to_markup(disambiguated)
+        else:
+            return word
     
     def hypotactic(self, word):
         '''
@@ -79,9 +70,10 @@ class Macronizer:
             return macron_integrate_markup(word, macrons)
         return word
 
-    def macronize(self, text, genre='prose'):
+    def macronize(self, text, genre='prose', stats=True):
         """
-        Macronization is a modular and recursive process comprised of the following operations: 
+        Macronization is a modular and recursive process comprised of the following operations, 
+        where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
             [wiktionary]
             [hypotactic]
             [nominal forms]
@@ -94,9 +86,7 @@ class Macronizer:
         text = Text(text, genre, doc_from_file=True, debug=self.debug)
         token_lemma_pos_morph = text.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
             
-        def macronization_modules(token, lemma, pos, morph, is_lemma=False):
-            second_pass = False
-
+        def macronization_modules(token, lemma, pos, morph, second_pass=False, is_lemma=False):
             wiktionary_token = self.wiktionary(token, lemma, pos, morph)
             hypotactic_token = self.hypotactic(token)
 
@@ -109,14 +99,13 @@ class Macronizer:
             dichrona_remaining = 0
             if count_dichrona_in_open_syllables(macronized_token) > 0:
                 if not second_pass:
-                    second_pass = True
                     oxytonized_token = replace_grave_with_acute(macronized_token)
-                    oxytonized_token = macronization_modules(oxytonized_token, lemma, pos, morph)
-                    macronized_token = merge_or_overwrite_markup(oxytonized_token, macronized_token)
+                    rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, second_pass=True))
+                    macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                     
-                if not is_lemma:
-                    lemma_token = macronization_modules(macronized_token, lemma, pos, morph, is_lemma=True)
-                    macronized_token = self.lemma_generalization(macronized_token, lemma_token)
+            if not is_lemma and count_dichrona_in_open_syllables(macronized_token) > 0:
+                lemma_token = macronization_modules(macronized_token, lemma, pos, morph, is_lemma=True)
+                macronized_token = self.lemma_generalization(macronized_token, lemma_token)
 
             return macronized_token
 
@@ -127,6 +116,8 @@ class Macronizer:
         text.macronized_words = macronized_tokens
         text.integrate()
 
+        if stats:
+            self.macronization_ratio(text, text.macronized_text, count_all_dichrona=True, count_proper_names=True)
         return text.macronized_text
     
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
@@ -223,7 +214,6 @@ class Macronizer:
         merged = merge_or_overwrite_markup(new_version, old_version)
         return merged
     
-
     def lemma_generalization(macronized_token, lemma_token):
         """
         Take a deep breath and focus. 
