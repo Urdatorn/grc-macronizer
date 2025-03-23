@@ -11,6 +11,7 @@ from format_macrons import macron_integrate_markup, macron_markup_to_unicode, ma
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
+from db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from db.wiktionary_singletons import wiktionary_singletons_map
 
 class Macronizer:
@@ -51,10 +52,9 @@ class Macronizer:
         """
         word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
         
-        match = wiktionary_singletons_map[word] # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
-        if len(match[0]) == 1: # if only one macronization present
-            return macron_unicode_to_markup(match[0][0])
-        elif len(match) > 1:
+        if word in wiktionary_singletons_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
+            return wiktionary_singletons_map[word][0][0] # get the db_word singleton content
+        elif word in wiktionary_ambiguous_map
             disambiguated = morph_disambiguator(word, lemma, pos, morph, match[0], match[1], match[2], match[3], match[4], match[5])
             return macron_unicode_to_markup(disambiguated)
         else:

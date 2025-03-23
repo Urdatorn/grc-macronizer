@@ -1,11 +1,6 @@
 '''
 ALGORITHMIC MACRONIZING: NOMINAL FORMS
 
-(barytone)
-(accentual rules) 
-(nominal forms) *YOU ARE HERE*
-(inheritance)
-
 
 See page 38 in CGCG for endings of nominal forms: ref/cgcg_nominal_forms.png
 
@@ -27,8 +22,8 @@ SUMMARY OF THE RELEVANT RULES OF NOMINAL FORMS
 - Acc pl (masc) => short α. Cf. 1D acc pl.
 
 ***NB: Note that some *dual* forms (1D on -ης) can be masculine on long -α, e.g. τὼ προφήτᾱ, ὁπλῑ́τᾱ (cf. voc. sing. ὠ προφῆτα)
-Probably hyper rare/inexistent in the corpus and not the case for 2D/3D and the most common masc duals like χεροῖν, χεῖρε.
-Duals like χεροῖν also break the dative rule. Hence all duals are excluded.
+While not the case for 2D/3D and the most common masculione duals like χεροῖν, χεῖρε,
+duals like χεροῖν also break the dative rule. Hence all duals are to be excluded tout court.
 
 This yields the following six fully generalizable rules:
     
@@ -68,7 +63,7 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
     It is primarily useful for *oxytones*.
     '''
 
-    if not word or not lemma or not pos or not morph:
+    if not word or not lemma or not pos or not morph: # TODO: is this necessary?
         return word
 
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
@@ -151,17 +146,14 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
                 return word[:-1] + "^" + word[-1]
         return word
     
-    # Call the first_declination function
     result = first_declination(word, lemma, morph)
     if result:
         return result
     
-    # Call the masc_and_neutre_short_alpha function
     result = masc_and_neutre_short_alpha(word, morph)
     if result:
         return result
     
-    # Call the dative_short_iota function
     result = dative_short_iota(word, morph)
     if result:
         return result
