@@ -4,7 +4,7 @@ import time
 from tqdm import tqdm
 from greek_accentuation.syllabify import add_necessary_breathing
 
-from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_with_grave
+from barytone import replace_grave_with_acute, replace_acute_with_grave
 from class_text import Text
 from epic_stop_words import epic_stop_words
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
@@ -51,7 +51,7 @@ class Macronizer:
         """
         word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
         
-        match = self.wiktionary_map[word] # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
+        match = wiktionary_singletons_map[word] # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
         if len(match[0]) == 1: # if only one macronization present
             return macron_unicode_to_markup(match[0][0])
         elif len(match) > 1:

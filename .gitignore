@@ -1,3 +1,8 @@
+# Use the following to check wheter any of the files here are still being tracked:
+# git ls-files --ignored --cached --exclude-standard
+# To clean all of them, pipe them to git rm with xargs:
+# git ls-files --ignored --cached --exclude-standard | xargs git rm --cached
+
 # ignore all pycache and pytest_cache dirs at all depths (note the slash to  the right)
 __pycache__/
 .pytest_cache/
