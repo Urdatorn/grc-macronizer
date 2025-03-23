@@ -8,10 +8,10 @@ from barytone import grave_to_acute, replace_grave_with_acute, replace_acute_wit
 from class_text import Text
 from epic_stop_words import epic_stop_words
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, has_ambiguous_dichrona_in_open_syllables, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
+from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
-from db.wiktionary_singletons import wiktionary_map
+from db.wiktionary_singletons import wiktionary_singletons_map
 
 class Macronizer:
     def __init__(self, 
