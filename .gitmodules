@@ -4,3 +4,6 @@
 [submodule "greek_proper_names_cltk"]
 	path = greek_proper_names_cltk
 	url = https://github.com/Urdatorn/greek_proper_names_cltk.git
+[submodule "grc_odycy_joint_trf"]
+	path = grc_odycy_joint_trf
+	url = https://huggingface.co/chcaa/grc_odycy_joint_trf
