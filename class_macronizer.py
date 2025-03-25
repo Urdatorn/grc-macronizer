@@ -11,6 +11,7 @@ from format_macrons import macron_integrate_markup, macron_markup_to_unicode, ma
 from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
+from verbal_forms import macronize_verbal_forms
 from db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from db.wiktionary_singletons import wiktionary_singletons_map
 
@@ -20,12 +21,11 @@ class Macronizer:
                  unicode=False,
                  hypotactic_db_file='db/hypotactic.db', 
                  aristophanes_db_file=None, 
-                 custom_db_file=None,
+                 custom_db_file='db/custom.py',
                  debug=False):
 
         self.macronize_everything = macronize_everything
         self.unicode = unicode
-        self.wiktionary_map = wiktionary_map
         self.hypotactic_db_file = hypotactic_db_file
         self.aristophanes_db_file = aristophanes_db_file
         self.custom_db_file = custom_db_file
@@ -52,10 +52,12 @@ class Macronizer:
         """
         word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
         
-        if word in wiktionary_singletons_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
-            return wiktionary_singletons_map[word][0][0] # get the db_word singleton content
-        elif word in wiktionary_ambiguous_map
-            disambiguated = morph_disambiguator(word, lemma, pos, morph, match[0], match[1], match[2], match[3], match[4], match[5])
+        if word in wiktionary_singletons_map:
+            disambiguated = wiktionary_singletons_map[word][0][0] # get the db_word singleton content
+            return macron_unicode_to_markup(disambiguated)
+        elif word in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
+            match = wiktionary_ambiguous_map[word]
+            disambiguated = morph_disambiguator(word, lemma, pos, morph, token=match[0], tense=match[1], case_voice=match[2], mode=match[3], person=match[4], number=match[5])
             return macron_unicode_to_markup(disambiguated)
         else:
             return word
@@ -76,29 +78,42 @@ class Macronizer:
         where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
             [wiktionary]
             [hypotactic]
-            [nominal forms]
+            [nominal forms] # needs to be moved here from Text
+            [verbal forms]
             [accent rules]
             [lemma-based generalization]
         Accent rules and (naturally) lemma-based generalization are the only modules that rely on the output of the other modules for optimal performance.
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
-        text = Text(text, genre, doc_from_file=True, debug=self.debug)
-        token_lemma_pos_morph = text.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
+        text_object = Text(text, genre, doc_from_file=True, debug=self.debug)
+        token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
             
         def macronization_modules(token, lemma, pos, morph, second_pass=False, is_lemma=False):
             wiktionary_token = self.wiktionary(token, lemma, pos, morph)
-            hypotactic_token = self.hypotactic(token)
 
+            if count_dichrona_in_open_syllables(wiktionary_token) == 0:
+                return wiktionary_token
+
+            hypotactic_token = self.hypotactic(token)
             macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
-            accent_rules_token = self.apply_accentuation_rules(macronized_token)
-            
+
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
+
+            nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
+            macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
+
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
+
+            accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
 
             # ἴθε δή, let's recursively macronize remaining dichrona
             dichrona_remaining = 0
             if count_dichrona_in_open_syllables(macronized_token) > 0:
-                if not second_pass:
+                if not second_pass and replace_acute_with_grave(macronized_token) != macronized_token: # only bother with actual barytones, obviously
                     oxytonized_token = replace_grave_with_acute(macronized_token)
                     rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, second_pass=True))
                     macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
@@ -113,12 +128,12 @@ class Macronizer:
         for token, lemma, pos, morph in token_lemma_pos_morph:
             macronized_tokens.append(macronization_modules(token, lemma, pos, morph))
 
-        text.macronized_words = macronized_tokens
-        text.integrate()
+        text_object.macronized_words = macronized_tokens
+        text_object.integrate() # creates the final .macronized_text
 
         if stats:
-            self.macronization_ratio(text, text.macronized_text, count_all_dichrona=True, count_proper_names=True)
-        return text.macronized_text
+            self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
+        return text_object.macronized_text
     
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
         def remove_proper_names(text):

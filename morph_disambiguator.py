@@ -36,12 +36,10 @@ def morph_disambiguator(word, lemma, pos, morph, token, tense, case_voice, mode,
         tense = morph.get("Tense")[0]
 
     # Case
-    if morph.get("Case"):
-        tense = morph.get("Tense")[0]
     for i, case in enumerate(case_voice):
         if spaCy_cases[morph] == case: # let's not nitpick and simply choose the first case that matches
             disambiguated_word = macron_unicode_to_markup(token[i]) 
-            return disambiguated_word if disambiguated_word.replace("^", "").replace("_", "") == word # make sure there's no fucking errors entering from ugly wiktionary entries, like missing accents
+            return disambiguated_word if disambiguated_word.replace("^", "").replace("_", "") == word else word # make sure there's no fucking errors entering from ugly wiktionary entries, like missing accents
         
     return word
 

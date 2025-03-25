@@ -30,7 +30,11 @@ class Text:
 
         to_remove = {'^', '_', '<', '>', '[', ']', '«', '»', '†'}
         translation_table = str.maketrans("", "", "".join(to_remove))
-        before_odycy = text.translate(translation_table)
+
+        before_odycy = text
+        if debug: 
+            print(f"Text before odyCy: {before_odycy}")
+        before_odycy = before_odycy.translate(translation_table)
 
         sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
@@ -42,7 +46,10 @@ class Text:
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             print(f"Hash value: {hash_value}")
-        output_file_name = f"odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
+        if len(sentence_list[0].split()) > 1: # ensure there are at least two words in the first sentence
+            output_file_name = f"odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
+        else:
+            output_file_name = f"odycy_docs/{sentence_list[0].split()[0] + '-' + hash_value}.spacy"
         docs = []
         if doc_from_file and os.path.exists(output_file_name):
             doc_bin = DocBin().from_disk(output_file_name)
