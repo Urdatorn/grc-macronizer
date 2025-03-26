@@ -1,22 +1,27 @@
 # Use the following to check wheter any of the files here are still being tracked:
-# git ls-files --ignored --cached --exclude-standard
+# > git ls-files --ignored --cached --exclude-standard
+
 # To clean all of them, pipe them to git rm with xargs:
-# git ls-files --ignored --cached --exclude-standard | xargs git rm --cached
+# > git ls-files --ignored --cached --exclude-standard | xargs git rm --cached
 
 # ignore all pycache and pytest_cache dirs at all depths (note the slash to  the right)
-__pycache__/
+**__pycache__/
 .pytest_cache/
 
 # Mac OS
-.DS_Store
+**.DS_Store
 
 # temp
-temp/
+**temp/
 
 # behind-the-scenes stuff
 format_anabasis.ipynb
 sandbox.ipynb
 odycy.ipynb
+
+# odycy docs (keeping the anabasis doc so users can use the benchmark faster)
+odycy_docs/
+!odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
 
 # unused db
 db/grc_macrons.db

@@ -9,10 +9,19 @@ from epic_stop_words import epic_stop_words
 from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
 from format_macrons import merge_or_overwrite_markup
-from grc_utils import normalize_word, make_only_greek
+from grc_utils import lower_grc, normalize_word
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
+
+def get_capital_positions(text):
+    capital_positions = []
+
+    for i, char in enumerate(text):
+        if char != lower_grc(char): # my definition of a capital letter (because lower_grc is using a defaulting .get)
+            capital_positions.append(i)
+            
+    return capital_positions
 
 class Text:
     '''
@@ -35,6 +44,8 @@ class Text:
         if debug: 
             print(f"Text before odyCy: {before_odycy}")
         before_odycy = before_odycy.translate(translation_table)
+
+        self.capital_positions = get_capital_positions(before_odycy)
 
         sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
@@ -101,13 +112,12 @@ class Text:
         Raises:
             ValueError: If a macronized word cannot be found in the original text.
         """
-        result_text = self.text
+        result_text = self.text # making a working copy
         macronized_words = [word for word in self.macronized_words if word is not None and any(macron in word for macron in ['_', '^'])]
         
         word_counts = {}
         
-        # Build a list of all replacements we need to make
-        replacements = []
+        replacements = [] # going to be a list of triples: (starting position, ending position, macronized word)
         
         for macronized_word in tqdm(macronized_words, desc="Finding replacements"):
             normalized_word = normalize_word(macronized_word.replace('_', '').replace('^', ''))
@@ -116,33 +126,31 @@ class Text:
             if not normalized_word:
                 continue
             
-            current_count = word_counts.get(normalized_word, 0)  # default to 0
+            current_count = word_counts.get(normalized_word, 0)  # how many times have we seen the present word before? default to 0
             
             if self.debug:
                 print(f"Processing: {macronized_word} (Current count: {current_count})")
             
-            # Find all matches in the original text
-            matches = list(re.finditer(fr"\b{normalized_word}\b", self.text))
+            matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
             
             if current_count >= len(matches):
                 raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
                 
-            # Get the position and length of the target occurrence
             target_match = matches[current_count]
+            # .start() and .end() are methods of a regex Match object, giving the start and end indices of the match
+            # NOTE TO SELF TO REMEMBER: .start() is inclusive, while .end() is *exclusive*, meaning .end() returns the index of the first character *just after* the match
             start_pos = target_match.start()
             end_pos = target_match.end()
             
-            # Store the replacement information
             replacements.append((start_pos, end_pos, macronized_word))
             
             word_counts[normalized_word] = current_count + 1
         
-        # Sort replacements by position (to apply them from end to beginning)
-        replacements.sort(reverse=True, key=lambda x: x[0])
+        # NOTE USEFUL NLP TRICK: Reversing the replacements list. This is because when a ^ or _ is added to a word, the positions of all subsequent words change, but those of all previous words remain the same.
+        replacements.sort(reverse=True, key=lambda x: x[0]) # the lambda means sorting by start_pos *only*: ties are left in their original order. I don't think this is necessary, because there shouldn't be two words with the identical start_pos.
         
-        # Apply all replacements (from end to beginning to avoid position shifts)
         for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements"):
-            result_text = result_text[:start_pos] + replacement + result_text[end_pos:]
+            result_text = result_text[:start_pos] + replacement + result_text[end_pos:] # remember, slicing (:) means "from and including" the start index and "up to but not including" the end index, so this line only works because .end() is exclusive, as noted above!
             
         self.macronized_text = result_text
         

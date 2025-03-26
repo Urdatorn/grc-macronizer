@@ -82,6 +82,7 @@ class Macronizer:
             [verbal forms]
             [accent rules]
             [lemma-based generalization]
+            [custom] # finally, hardcode whatever macronizations you want to overwrite every other module
         Accent rules and (naturally) lemma-based generalization are the only modules that rely on the output of the other modules for optimal performance.
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
@@ -90,25 +91,36 @@ class Macronizer:
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
             
         def macronization_modules(token, lemma, pos, morph, second_pass=False, is_lemma=False):
+            if self.debug:
+                print(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
+
             wiktionary_token = self.wiktionary(token, lemma, pos, morph)
+            if self.debug:
+                print(f'✅ Wiktionary: {count_dichrona_in_open_syllables(wiktionary_token)} left')
 
             if count_dichrona_in_open_syllables(wiktionary_token) == 0:
                 return wiktionary_token
 
             hypotactic_token = self.hypotactic(token)
             macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
+            if self.debug:
+                print(f'✅ Hypotactic: {count_dichrona_in_open_syllables(macronized_token)} left')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
             nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
             macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
+            if self.debug:
+                print(f'✅ Nominal forms: {count_dichrona_in_open_syllables(macronized_token)} left')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
             accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
+            if self.debug:
+                print(f'✅ Accent rules: {count_dichrona_in_open_syllables(macronized_token)} left')
 
             # ἴθε δή, let's recursively macronize remaining dichrona
             dichrona_remaining = 0
@@ -117,10 +129,16 @@ class Macronizer:
                     oxytonized_token = replace_grave_with_acute(macronized_token)
                     rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, second_pass=True))
                     macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
+                    if self.debug and rebarytonized_token != macronized_token:
+                        print(f'✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
+                    else:
+                        print(f'❌ Oxytonizing did not help')
                     
             if not is_lemma and count_dichrona_in_open_syllables(macronized_token) > 0:
                 lemma_token = macronization_modules(macronized_token, lemma, pos, morph, is_lemma=True)
                 macronized_token = self.lemma_generalization(macronized_token, lemma_token)
+                if self.debug:
+                    print(f'✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
 
             return macronized_token
 
@@ -229,9 +247,9 @@ class Macronizer:
         merged = merge_or_overwrite_markup(new_version, old_version)
         return merged
     
-    def lemma_generalization(macronized_token, lemma_token):
+    def lemma_generalization(self, macronized_token, lemma_token):
         """
         Take a deep breath and focus. 
         This is probably the one module with the greatest potential for optimization, given enough ingenuity.
         """
-        pass
+        return macronized_token
