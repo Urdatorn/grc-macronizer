@@ -1,19 +1,27 @@
+import logging
 import re
+import subprocess
 import sqlite3
-import time
+
 from tqdm import tqdm
 from greek_accentuation.syllabify import add_necessary_breathing
 
 from barytone import replace_grave_with_acute, replace_acute_with_grave
 from class_text import Text
-from epic_stop_words import epic_stop_words
+from db.custom import custom_macronizer
+from db.wiktionary_ambiguous import wiktionary_ambiguous_map
+from db.wiktionary_singletons import wiktionary_singletons_map
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
+from grc_utils import GRAVES, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, lower_grc, upper_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
-from db.wiktionary_ambiguous import wiktionary_ambiguous_map
-from db.wiktionary_singletons import wiktionary_singletons_map
+
+logging.basicConfig(
+    level=logging.DEBUG, # INFO or DEBUG
+    filename="macronizer.log",
+    format="%(asctime)s - %(message)s"
+)
 
 class Macronizer:
     def __init__(self, 
@@ -44,7 +52,7 @@ class Macronizer:
             for token, macrons in rows:
                 self.hypotactic_map[token] = macrons
         except sqlite3.Error as e:
-            print(f"Warning: Could not load hypotactic database: {e}")
+            logging.info(f"Warning: Could not load hypotactic database: {e}")
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -90,67 +98,132 @@ class Macronizer:
         text_object = Text(text, genre, doc_from_file=True, debug=self.debug)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
             
-        def macronization_modules(token, lemma, pos, morph, second_pass=False, is_lemma=False):
-            if self.debug:
-                print(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
+        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, is_lemma=False):
+            
+            recursion_depth += 1
+            if recursion_depth > 10:
+                raise RecursionError("Maximum recursion depth exceeded in macronization_modules")
+            
+            if oxytonized_pass:
+                logging.debug(f'🔄 Macronizing (oxytonized): {token} ({lemma}, {pos}, {morph})')
+            elif capitalized_pass:
+                logging.debug(f'🔄 Macronizing (capitalized): {token} ({lemma}, {pos}, {morph})')
+            elif decapitalized_pass:
+                logging.debug(f'🔄 Macronizing (decapitalized): {token} ({lemma}, {pos}, {morph})')
+            elif is_lemma:
+                logging.debug(f'🔄 Macronizing (lemma): {token} ({lemma}, {pos}, {morph})')
+            else:
+                logging.debug(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
 
             wiktionary_token = self.wiktionary(token, lemma, pos, morph)
             if self.debug:
-                print(f'✅ Wiktionary: {count_dichrona_in_open_syllables(wiktionary_token)} left')
+                logging.debug(f'\t✅ Wiktionary: {token} => {wiktionary_token}, with {count_dichrona_in_open_syllables(wiktionary_token)} left')
 
             if count_dichrona_in_open_syllables(wiktionary_token) == 0:
                 return wiktionary_token
 
             hypotactic_token = self.hypotactic(token)
-            macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
             if self.debug:
-                print(f'✅ Hypotactic: {count_dichrona_in_open_syllables(macronized_token)} left')
+                logging.debug(f'\t✅ Hypotactic: {wiktionary_token} => {merge_or_overwrite_markup(hypotactic_token, wiktionary_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(hypotactic_token, wiktionary_token))} left')
+            macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
             nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
-            macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
             if self.debug:
-                print(f'✅ Nominal forms: {count_dichrona_in_open_syllables(macronized_token)} left')
+                logging.debug(f'\t✅ Nominal forms: {macronized_token} => {merge_or_overwrite_markup(nominal_forms_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(nominal_forms_token, macronized_token))} left')
+            macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
             accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
-            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
             if self.debug:
-                print(f'✅ Accent rules: {count_dichrona_in_open_syllables(macronized_token)} left')
+                logging.debug(f'\t✅ Accent rules: {macronized_token} => {merge_or_overwrite_markup(accent_rules_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(accent_rules_token, macronized_token))} left')
+            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
+
+            custom_token = custom_macronizer(macronized_token)
+            if self.debug and custom_token != macronized_token:
+                logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
+            elif self.debug:
+                logging.debug(f'\t❌ Custom did not help')
+            macronized_token = merge_or_overwrite_markup(custom_token, macronized_token)
 
             # ἴθε δή, let's recursively macronize remaining dichrona
-            dichrona_remaining = 0
-            if count_dichrona_in_open_syllables(macronized_token) > 0:
-                if not second_pass and replace_acute_with_grave(macronized_token) != macronized_token: # only bother with actual barytones, obviously
-                    oxytonized_token = replace_grave_with_acute(macronized_token)
-                    rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, second_pass=True))
+
+            # TODO We should also try removing prefixes, e.g. ἀπο-κτενῶν => macronize κτενῶν, and then reattach the prefix
+            
+            # OXYTONIZING RECURSION
+            if count_dichrona_in_open_syllables(macronized_token) > 0 and macronized_token[-1] in GRAVES:
+                oxytonized_token = macronized_token[:-1] + replace_grave_with_acute(macronized_token[-1])
+                if not oxytonized_pass and replace_acute_with_grave(macronized_token) != macronized_token: # only bother with actual barytones, obviously
+                    rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma))
                     macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                     if self.debug and rebarytonized_token != macronized_token:
-                        print(f'✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
+                        logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
                     else:
-                        print(f'❌ Oxytonizing did not help')
-                    
-            if not is_lemma and count_dichrona_in_open_syllables(macronized_token) > 0:
-                lemma_token = macronization_modules(macronized_token, lemma, pos, morph, is_lemma=True)
-                macronized_token = self.lemma_generalization(macronized_token, lemma_token)
-                if self.debug:
-                    print(f'✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
+                        logging.debug(f'\t❌ Oxytonizing did not help')
+
+            # CAPITALIZING RECURSION
+            if count_dichrona_in_open_syllables(macronized_token) > 0:
+                capitalized_token = upper_grc(macronized_token[0]) + macronized_token[1:]
+                if not capitalized_pass and not decapitalized_pass and pos == "PROPN" and macronized_token != capitalized_token: # if the token is an all lowercase proper noun, try capitalizing it
+                    if self.debug:
+                        logging.debug(f'\t Capitalizing {macronized_token} as {capitalized_token}')
+                    old_macronized_token = macronized_token
+                    macronized_token = merge_or_overwrite_markup(macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma), macronized_token)
+                    if self.debug and macronized_token != old_macronized_token:
+                        logging.debug(f'\t✅ Capitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                    else:
+                        logging.debug(f'\t❌ Capitalization did not help')
+
+            # DECAPITALIZING RECURSION
+            # if count_dichrona_in_open_syllables(macronized_token) > 0:
+            #     decapitalized_token = lower_grc(macronized_token[0]) + macronized_token[1:]
+            #     if not capitalized_pass and not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
+            #         if self.debug:
+            #             logging.debug(f'\t Decapitalizing {macronized_token} as {decapitalized_token}')
+            #         old_macronized_token = macronized_token
+            #         decapitalized_token = merge_or_overwrite_markup(macronization_modules(decapitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass,  decapitalized_pass=True, is_lemma=is_lemma), macronized_token)
+            #         if count_dichrona_in_open_syllables(decapitalized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+            #             macronized_token = decapitalized_token
+            #             if self.debug:
+            #                 logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+            #         elif self.debug:
+            #             logging.debug(f'\t❌ Decapitalization did not help')
+
+            # LEMMA-BASED GENERALIZATION RECURSION
+            if count_dichrona_in_open_syllables(macronized_token) > 0:
+                decapitalized_token = lower_grc(token.replace('^', ''))
+                if not is_lemma and not decapitalized_token == lemma: # if the token is capitalized and is the lemma itself, we get infinite recursion
+                    lemma_token = macronization_modules(macronized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=True)
+                    macronized_token = self.lemma_generalization(macronized_token, lemma_token)
+                    if self.debug:
+                        logging.debug(f'\t✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
 
             return macronized_token
 
         macronized_tokens = []
-        for token, lemma, pos, morph in token_lemma_pos_morph:
-            macronized_tokens.append(macronization_modules(token, lemma, pos, morph))
+        still_ambiguous = []
+        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens"):
+            result = macronization_modules(token, lemma, pos, morph)
+            if count_dichrona_in_open_syllables(result) > 0:
+                still_ambiguous.append(result)
+            macronized_tokens.append(result)
 
         text_object.macronized_words = macronized_tokens
         text_object.integrate() # creates the final .macronized_text
 
         if stats:
             self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
+
+        with open('still_ambiguous.py', 'w', encoding='utf-8') as f:
+            f.write('still_ambiguous = [\n')
+            for item in still_ambiguous:
+                f.write(f'    {repr(item)},\n')
+            f.write(']\n')
+
         return text_object.macronized_text
     
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
@@ -163,11 +236,10 @@ class Macronizer:
             cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
 
             return cleaned_text
-        start_time = time.perf_counter()
 
         text = normalize_word(text)
         if not count_proper_names:
-            print("\nRemoving proper names...")
+            logging.debug("\nRemoving proper names...")
             text = remove_proper_names(text)
 
         count_before = 0
@@ -180,7 +252,6 @@ class Macronizer:
             print(f"Dichrona in open syllables not covered by accent rules before: {count_before}")
             print(f"Dichrona in open syllables not covered by accent rules after: {count_after}")
         else:
-            print("\nCounting all dichrona...")
             count_before = count_dichrona_in_open_syllables(text)
             count_after = count_dichrona_in_open_syllables(macronized_text)
             print(f"Dichrona in open syllables before: {count_before}")
@@ -188,19 +259,19 @@ class Macronizer:
             
         difference = count_before - count_after
 
-        end_time = time.perf_counter()
-        print(f"\nEvaluation took {end_time - start_time:.2f} seconds")
-
-        print(f"Difference: {difference}")
+        print(f"{difference} dichrona macronized.")
 
         ratio = difference / count_before if count_before > 0 else 0
+
+        print(f"Macronization ratio: {ratio:.2%}")
+
         return ratio
     
     def apply_accentuation_rules(self, old_version):
         if not old_version:
             return old_version
         old_version = normalize_word(old_version)
-        old_version = macron_unicode_to_markup(old_version)
+
         new_version = old_version.replace('_', '').replace('^', '') # this will be updated later
 
         list_of_syllables = syllabifier(old_version) # important: needs to use old_version, for markup to potentially decide short_vowel and long_acute
@@ -223,19 +294,19 @@ class Macronizer:
             if position == -2 and paroxytone(new_version) and short_vowel(ultima):
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1): # NB: len(syllable)-1 is the index of the last character (0-indexed); -1 is to go backwards
-                    if vowel(syllable[i]) and i in DICHRONA:
+                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             elif position == -1 and paroxytone(new_version) and long_acute(penultima):
                 # Find the last vowel in syllable and append '_' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]) and i in DICHRONA:
+                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
                         modified_syllable = syllable[:i+1] + '_' + syllable[i+1:]
                         break
             elif position == -1 and (properispomenon(new_version) or proparoxytone(new_version)):
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]) and i in DICHRONA:
+                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             modified_syllable_positions.append((position, modified_syllable))
