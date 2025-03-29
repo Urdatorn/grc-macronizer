@@ -54,6 +54,14 @@ from grc_utils import only_bases
 # short_masc_neut_alpha(token, tag)
 # short_dat(token, tag)
 
+def macronize_nominal_stem_suffixes(word, lemma, pos, morph, debug=False):
+    '''
+    The idea is to try and catch some common ways to form words; primarily adjectives.
+    We have to tread carefully, because the risk of accidentally including too much is super high here.
+    '''
+    if only_bases(lemma)[-4:] == "ικος":
+        if only_bases(word)[-4:] == "ικος" or only_bases(word)[-4:] == "ικον":
+            return word[:-3] + "^" + word[-3:]
 
 def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
     '''
@@ -68,10 +76,10 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
 
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
 
-    if pos not in nominal_pos_tags or (morph is not None and "Dual" in morph.get("Number", [])):
-        if debug:
-            print(f"{word} is {pos} which is not NOUN or ADJ; or is DUAL")
-        return word
+    # if pos not in nominal_pos_tags or (morph is not None and "Dual" in morph.get("Number", [])):
+    #     if debug:
+    #         print(f"{word} is {pos} which is not NOUN or ADJ; or is DUAL")
+    #     return word
 
     if debug:
         print(f'odyCy on {word}: \n\tLemma {lemma}, \n\tPOS: {pos}, \n\tMorphology: {morph}')

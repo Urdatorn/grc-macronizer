@@ -1,3 +1,4 @@
+import logging
 import os
 from tqdm import tqdm
 import xxhash
@@ -9,7 +10,7 @@ from epic_stop_words import epic_stop_words
 from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
 from format_macrons import merge_or_overwrite_markup
-from grc_utils import lower_grc, normalize_word
+from grc_utils import base_alphabet, lower_grc, upper_grc, normalize_word
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
@@ -23,6 +24,39 @@ def get_capital_positions(text):
             
     return capital_positions
 
+def malformed(word):
+    '''
+    Filters out words without any diacritics.
+    Aimed to catch words mutilated by odyCy, such as "τοὔ" and "νομα" from "τοὔνομα".
+    The only proper such words are enclitics starting with consonants, such as φημι,
+    which are extraordinarily few and can be collected in a stoplist. 
+    '''
+    stoplist = { # TODO
+        "φημι",
+    }
+
+    if (char in base_alphabet for char in word) and word not in stoplist:
+        return True
+    else:
+        return False
+    
+def word_list(text):
+    greek_punctuation = r'[\u0387\u037e\.,!?;:\"\'()\[\]{}<>\-—…]' # NOTE hypens must be escaped (AI usually misses this)
+    
+    cleaned_text = re.sub(greek_punctuation, ' ', text)
+
+    word_list = [word for word in cleaned_text.split() if word]
+    
+    logging.debug(f"Word list: {word_list}")
+
+    return word_list
+
+def odyCy_made_a_slice_of_prosciutto_rather_than_a_word(string):
+    pass
+
+
+
+
 class Text:
     '''
     Container for text and metadata during macronization.
@@ -35,6 +69,7 @@ class Text:
 
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
+
     def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
 
         to_remove = {'^', '_', '<', '>', '[', ']', '«', '»', '†'}
@@ -42,21 +77,23 @@ class Text:
 
         before_odycy = text
         if debug: 
-            print(f"Text before odyCy: {before_odycy}")
+            logging.debug(f"Text before odyCy: {before_odycy}")
         before_odycy = before_odycy.translate(translation_table)
+
+        diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
         self.capital_positions = get_capital_positions(before_odycy)
 
         sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
-            print(f'Split input into {len(sentence_list)} sentences.')
+            logging.debug(f'Split input into {len(sentence_list)} sentences.')
             for i, sentence in enumerate(sentence_list):
-                print(f"{i}: {sentence}")
+                logging.debug(f"{i}: {sentence}")
 
         # odyCy tokenization
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
-            print(f"Hash value: {hash_value}")
+            logging.debug(f"Hash value: {hash_value}")
         if len(sentence_list[0].split()) > 1: # ensure there are at least two words in the first sentence
             output_file_name = f"odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
         else:
@@ -72,20 +109,26 @@ class Text:
             doc_bin = DocBin()
             for doc in docs:
                 doc_bin.add(doc)
-            print(f"Saving odyCy doc bin to disc as {output_file_name}")
+            logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
             doc_bin.to_disk(output_file_name)
 
+        fail_counter = 0
         token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
         for doc in docs: # don't worry, pipe() returns docs in the right order
             for token in doc:
                 if token.orth_ and token.lemma_ and token.pos_ and token.morph:
                     orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
-                    if genre == 'epic':
-                        if orth in epic_stop_words:
-                            continue
+                    if genre == 'epic' and orth in epic_stop_words:
+                        continue
+                    if orth not in diagnostic_word_list:
+                        fail_counter += 1
+                        logging.warning(f"Word '{orth}' not in diagnostic word list. odyCy messed up here.")
+                        continue
                     token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
                     macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
+
+        logging.info(f'odyCy fail count: {fail_counter}')
 
         self.text = text
         self.genre = genre
@@ -102,15 +145,8 @@ class Text:
 
     def integrate(self):
         """
-        Integrates the macronized words back into the original text.
-        
-        For each macronized word in self.macronized_words, it chronologically searches for the n+1:th
-        occurrence of the corresponding word in the original text (where n is the number of times
-        this word has already been processed). It then substitutes a new 
-        merged version (of the macronized word and the original word) for the original word.
-        
-        Raises:
-            ValueError: If a macronized word cannot be found in the original text.
+        Integrates the macronized words back into the original text, 
+        while recapitalizing words that have been lowered by odyCy. 
         """
         result_text = self.text # making a working copy
         macronized_words = [word for word in self.macronized_words if word is not None and any(macron in word for macron in ['_', '^'])]
@@ -129,18 +165,32 @@ class Text:
             current_count = word_counts.get(normalized_word, 0)  # how many times have we seen the present word before? default to 0
             
             if self.debug:
-                print(f"Processing: {macronized_word} (Current count: {current_count})")
+                logging.debug(f"Processing: {macronized_word} (Current count: {current_count})")
             
+            # Find all matches of the normalized word in the original text
             matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
             
             if current_count >= len(matches):
                 raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
-                
+                # NOTE Skipping capitalization for now, it caused bugs like changing 'ντο. Μετὰ ταῦτα Κῦρο' to 'ντο. Μετὰ Ταῦτα Κῦρο'
+                # And I think we already fixed the origin of the worst capitalization problem in the first place?
+                # If we can't find the nth occurrence, try capitalizing the first letter
+                #capitalized_word = upper_grc(normalized_word[0]) + normalized_word[1:]
+                #matches = list(re.finditer(fr"\b{capitalized_word}\b", self.text))
+                #if current_count >= len(matches):
+                #    raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}' or '{capitalized_word}'")
+                #normalized_word = capitalized_word  # Update normalized_word to the capitalized version
+            
             target_match = matches[current_count]
             # .start() and .end() are methods of a regex Match object, giving the start and end indices of the match
             # NOTE TO SELF TO REMEMBER: .start() is inclusive, while .end() is *exclusive*, meaning .end() returns the index of the first character *just after* the match
             start_pos = target_match.start()
             end_pos = target_match.end()
+            
+            # Check if the word at start_pos should be capitalized based on self.capital_positions
+            if start_pos in self.capital_positions:
+                # Capitalize the first character of the macronized word
+                macronized_word = upper_grc(macronized_word[0]) + macronized_word[1:]
             
             replacements.append((start_pos, end_pos, macronized_word))
             
@@ -151,7 +201,7 @@ class Text:
         
         for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements"):
             result_text = result_text[:start_pos] + replacement + result_text[end_pos:] # remember, slicing (:) means "from and including" the start index and "up to but not including" the end index, so this line only works because .end() is exclusive, as noted above!
-            
+        
         self.macronized_text = result_text
         
         # Verify that only macrons have been changed
@@ -175,21 +225,3 @@ class Text:
             raise ValueError("Integration corrupted the text: changes other than macrons were made.")
         
         return self.macronized_text
-
-
-if __name__ == "__main__":
-    input = "ἔχω κιθάρας ἀγαθάς. νεανίας δ' εἰμὶ ἀάατος. κιθάρας ἀγαθάς ἔχω."
-    input = anabasis
-    text = Text(input, doc_from_file=True, debug=True)
-    #print(text.macronized_nominal_forms)
-    
-    # Test the integrate method
-    text.macronized_text = text.integrate()
-    #print("Macronized text:", text.macronized_text)
-    length_of_docs = 0
-    for doc in text.docs:
-        for token in doc:
-            length_of_docs += 1
-
-    print(f'Len of docs: {length_of_docs}')
-    print(f'Len of macronized_words: {len(text.macronized_words)}')

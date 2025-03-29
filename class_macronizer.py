@@ -1,27 +1,53 @@
 import logging
+import os
 import re
-import subprocess
 import sqlite3
 
-from tqdm import tqdm
-from greek_accentuation.syllabify import add_necessary_breathing
+from tqdm import tqdm as original_tqdm
 
+from ascii import ascii_macronizer
 from barytone import replace_grave_with_acute, replace_acute_with_grave
 from class_text import Text
 from db.custom import custom_macronizer
 from db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from db.wiktionary_singletons import wiktionary_singletons_map
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import GRAVES, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, lower_grc, upper_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel
+from grc_utils import GRAVES, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, lower_grc, upper_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, word_with_real_dichrona
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
 
+class tqdm(original_tqdm):
+    def __init__(self, *args, **kwargs):
+        if 'position' not in kwargs:
+            kwargs['position'] = 1  # Default to line 1 (0-based index)
+        super().__init__(*args, **kwargs)
+
 logging.basicConfig(
     level=logging.DEBUG, # INFO or DEBUG
-    filename="macronizer.log",
+    filename="diagnostics/macronizer.log",
     format="%(asctime)s - %(message)s"
 )
+
+logging.info("Starting new log...")
+for line in ascii_macronizer:
+    logging.info(line)
+
+diphth_y = r'[αεηο][ὐὔυὑύὖῦὕὗὺὒὓ]'
+diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
+adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅἂἃἤἥἣἢἦἧἆἇὧὦ]ι'
+
+combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
+
+def macronized_diphthong(word):
+    '''
+    Part of the sanity check. 
+    >>> macronized_diphthong("χίλι^οι)
+    False
+    >>> macronized_diphthong("χίλιοι^")
+    True
+    '''
+    return bool(re.search(combined_pattern, word))
 
 class Macronizer:
     def __init__(self, 
@@ -172,7 +198,11 @@ class Macronizer:
                     if self.debug:
                         logging.debug(f'\t Capitalizing {macronized_token} as {capitalized_token}')
                     old_macronized_token = macronized_token
-                    macronized_token = merge_or_overwrite_markup(macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma), macronized_token)
+                    capitalized_token = macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
+                    restored_token = old_macronized_token[0] + capitalized_token[1:] # restore the original first character
+                    logging.debug(f'\t Restoring capitalized token: {capitalized_token} => {restored_token}')
+
+                    macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
                     if self.debug and macronized_token != old_macronized_token:
                         logging.debug(f'\t✅ Capitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     else:
@@ -202,6 +232,8 @@ class Macronizer:
                     if self.debug:
                         logging.debug(f'\t✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
 
+            assert not macronized_diphthong(macronized_token), f"Watch out! We just macronized a diphthong: {macronized_token}"
+
             return macronized_token
 
         macronized_tokens = []
@@ -217,12 +249,30 @@ class Macronizer:
 
         if stats:
             self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
+        
+        file_version = 1
+        file_stub = ''
+        file_name = ''
 
-        with open('still_ambiguous.py', 'w', encoding='utf-8') as f:
-            f.write('still_ambiguous = [\n')
-            for item in still_ambiguous:
-                f.write(f'    {repr(item)},\n')
-            f.write(']\n')
+        if len(macronized_tokens) > 0:
+            if macronized_tokens[0]:
+                file_stub = f'diagnostics/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
+            else:
+                file_stub = f'diagnostics/still_ambiguous'
+
+            while True:
+                file_version = str(file_version)
+                file_name = file_stub + f'_{file_version}.py'
+                if not os.path.exists(file_name):
+                    break
+                file_version = int(file_version)
+                file_version += 1
+        
+            with open(file_name, 'w', encoding='utf-8') as f:
+                f.write('still_ambiguous = [\n')
+                for item in still_ambiguous:
+                    f.write(f'    {repr(item)},\n')
+                f.write(']\n')
 
         return text_object.macronized_text
     
@@ -294,19 +344,19 @@ class Macronizer:
             if position == -2 and paroxytone(new_version) and short_vowel(ultima):
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1): # NB: len(syllable)-1 is the index of the last character (0-indexed); -1 is to go backwards
-                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
+                    if vowel(syllable[i]) and word_with_real_dichrona(syllable):
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             elif position == -1 and paroxytone(new_version) and long_acute(penultima):
                 # Find the last vowel in syllable and append '_' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
+                    if vowel(syllable[i]) and word_with_real_dichrona(syllable):
                         modified_syllable = syllable[:i+1] + '_' + syllable[i+1:]
                         break
             elif position == -1 and (properispomenon(new_version) or proparoxytone(new_version)):
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1):
-                    if vowel(syllable[i]) and syllable[i] in DICHRONA:
+                    if vowel(syllable[i]) and word_with_real_dichrona(syllable):
                         modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
                         break
             modified_syllable_positions.append((position, modified_syllable))
@@ -316,6 +366,8 @@ class Macronizer:
         #print("New version:", new_version) # debugging
 
         merged = merge_or_overwrite_markup(new_version, old_version)
+
+        assert not macronized_diphthong(merged), f"Watch out! We just macronized a diphthong: {merged}"
         return merged
     
     def lemma_generalization(self, macronized_token, lemma_token):
