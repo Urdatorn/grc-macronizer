@@ -10,7 +10,7 @@ from epic_stop_words import epic_stop_words
 from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
 from format_macrons import merge_or_overwrite_markup
-from grc_utils import base_alphabet, lower_grc, upper_grc, normalize_word
+from grc_utils import base_alphabet, count_dichrona_in_open_syllables, lower_grc, upper_grc, normalize_word
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
@@ -41,21 +41,15 @@ def malformed(word):
         return False
     
 def word_list(text):
-    greek_punctuation = r'[\u0387\u037e\.,!?;:\"\'()\[\]{}<>\-—…]' # NOTE hypens must be escaped (AI usually misses this)
+    greek_punctuation = r'[\u0387\u037e\.,!?;:\"\'()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
     
     cleaned_text = re.sub(greek_punctuation, ' ', text)
 
     word_list = [word for word in cleaned_text.split() if word]
     
-    logging.debug(f"Word list: {word_list}")
+    logging.debug(f"Diagnostic word list: {word_list}")
 
     return word_list
-
-def odyCy_made_a_slice_of_prosciutto_rather_than_a_word(string):
-    pass
-
-
-
 
 class Text:
     '''
@@ -112,22 +106,37 @@ class Text:
             logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
             doc_bin.to_disk(output_file_name)
 
+        # Preparing the master list of words to be macronized (NOTE often THE key step in analyzing nonplussing bugs)
         fail_counter = 0
         token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
         for doc in docs: # don't worry, pipe() returns docs in the right order
             for token in doc:
-                if token.orth_ and token.lemma_ and token.pos_ and token.morph:
+                logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
+                if token.orth_ and token.lemma_ and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs
                     orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
+                    logging.debug(f"\t'Orth' token: {orth}")
                     if genre == 'epic' and orth in epic_stop_words:
+                        logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
                         continue
                     if orth not in diagnostic_word_list:
                         fail_counter += 1
-                        logging.warning(f"Word '{orth}' not in diagnostic word list. odyCy messed up here.")
+                        logging.debug(f"\033Word '{orth}' not in diagnostic word list. odyCy messed up here. Skipping with 'continue'.")
                         continue
-                    token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
+                    # For speed, let's not bother even sending words without dichrona to the macronizer
+                    if count_dichrona_in_open_syllables(orth) == 0:
+                        logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
+                        continue
+                    if not token.morph:
+                        logging.debug(f"\033{orth} has no morph. Appending morph as None.")
+                        token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, None])
+                    else:
+                        token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
+                    logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                     macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
+        logging.debug(f'Len of token_lemma_pos_morph: {len(token_lemma_pos_morph)}')
+        logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[:10][0]}')
         logging.info(f'odyCy fail count: {fail_counter}')
 
         self.text = text
@@ -199,7 +208,7 @@ class Text:
         # NOTE USEFUL NLP TRICK: Reversing the replacements list. This is because when a ^ or _ is added to a word, the positions of all subsequent words change, but those of all previous words remain the same.
         replacements.sort(reverse=True, key=lambda x: x[0]) # the lambda means sorting by start_pos *only*: ties are left in their original order. I don't think this is necessary, because there shouldn't be two words with the identical start_pos.
         
-        for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements"):
+        for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements", leave=False):
             result_text = result_text[:start_pos] + replacement + result_text[end_pos:] # remember, slicing (:) means "from and including" the start index and "up to but not including" the end index, so this line only works because .end() is exclusive, as noted above!
         
         self.macronized_text = result_text

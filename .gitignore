@@ -19,6 +19,9 @@ format_anabasis.ipynb
 sandbox.ipynb
 odycy.ipynb
 
+# diagnostics
+diagnostics/
+
 # odycy docs (keeping the anabasis doc so users can use the benchmark faster)
 odycy_docs/
 !odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy

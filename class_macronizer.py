@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import os
 import re
@@ -23,9 +24,12 @@ class tqdm(original_tqdm):
             kwargs['position'] = 1  # Default to line 1 (0-based index)
         super().__init__(*args, **kwargs)
 
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # e.g., 20250329_120059
+log_filename = f"diagnostics/macronizer_{timestamp}.log"
+
 logging.basicConfig(
-    level=logging.DEBUG, # INFO or DEBUG
-    filename="diagnostics/macronizer.log",
+    level=logging.DEBUG,
+    filename=log_filename,
     format="%(asctime)s - %(message)s"
 )
 
@@ -60,9 +64,9 @@ class Macronizer:
 
         self.macronize_everything = macronize_everything
         self.unicode = unicode
-        self.hypotactic_db_file = hypotactic_db_file
-        self.aristophanes_db_file = aristophanes_db_file
-        self.custom_db_file = custom_db_file
+        self.hypotactic_db_file = 'db/hypotactic.db'
+        self.aristophanes_db_file = None
+        self.custom_db_file = 'db/custom.py'
         self.debug = debug
 
         
@@ -239,6 +243,7 @@ class Macronizer:
         macronized_tokens = []
         still_ambiguous = []
         for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens"):
+            logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
             if count_dichrona_in_open_syllables(result) > 0:
                 still_ambiguous.append(result)
