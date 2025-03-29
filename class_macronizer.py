@@ -57,9 +57,6 @@ class Macronizer:
     def __init__(self, 
                  macronize_everything=True,
                  unicode=False,
-                 hypotactic_db_file='db/hypotactic.db', 
-                 aristophanes_db_file=None, 
-                 custom_db_file='db/custom.py',
                  debug=False):
 
         self.macronize_everything = macronize_everything
@@ -68,8 +65,6 @@ class Macronizer:
         self.aristophanes_db_file = None
         self.custom_db_file = 'db/custom.py'
         self.debug = debug
-
-        
 
         self.hypotactic_map = {}
         try:
@@ -105,6 +100,8 @@ class Macronizer:
         >>> hypotactic('ἀγαθῆς')
         >>> ἀ^γα^θῆς
         '''
+        word = word.replace('^', '').replace('_', '')
+
         macrons = self.hypotactic_map.get(word)
         if macrons:
             return macron_integrate_markup(word, macrons)
@@ -145,17 +142,30 @@ class Macronizer:
             else:
                 logging.debug(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
 
-            wiktionary_token = self.wiktionary(token, lemma, pos, morph)
+            macronized_token = token
+
+            custom_token = custom_macronizer(macronized_token)
+            if self.debug and custom_token != macronized_token:
+                logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
+            elif self.debug:
+                logging.debug(f'\t❌ Custom did not help')
+            macronized_token = merge_or_overwrite_markup(custom_token, macronized_token)
+
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
+
+            wiktionary_token = self.wiktionary(macronized_token, lemma, pos, morph)
             if self.debug:
                 logging.debug(f'\t✅ Wiktionary: {token} => {wiktionary_token}, with {count_dichrona_in_open_syllables(wiktionary_token)} left')
+            macronized_token = merge_or_overwrite_markup(wiktionary_token, macronized_token)
 
-            if count_dichrona_in_open_syllables(wiktionary_token) == 0:
-                return wiktionary_token
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
 
-            hypotactic_token = self.hypotactic(token)
+            hypotactic_token = self.hypotactic(macronized_token)
             if self.debug:
                 logging.debug(f'\t✅ Hypotactic: {wiktionary_token} => {merge_or_overwrite_markup(hypotactic_token, wiktionary_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(hypotactic_token, wiktionary_token))} left')
-            macronized_token = merge_or_overwrite_markup(hypotactic_token, wiktionary_token)
+            macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
@@ -173,20 +183,19 @@ class Macronizer:
                 logging.debug(f'\t✅ Accent rules: {macronized_token} => {merge_or_overwrite_markup(accent_rules_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(accent_rules_token, macronized_token))} left')
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
 
-            custom_token = custom_macronizer(macronized_token)
-            if self.debug and custom_token != macronized_token:
-                logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
-            elif self.debug:
-                logging.debug(f'\t❌ Custom did not help')
-            macronized_token = merge_or_overwrite_markup(custom_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
+
+
 
             # ἴθε δή, let's recursively macronize remaining dichrona
 
-            # TODO We should also try removing prefixes, e.g. ἀπο-κτενῶν => macronize κτενῶν, and then reattach the prefix
+            # TODO We should also try macronizing prefixes by checking if what's left of them is still a word, e.g. ἀπο-κτενῶν => κτενῶν
             
             # OXYTONIZING RECURSION
-            if count_dichrona_in_open_syllables(macronized_token) > 0 and macronized_token[-1] in GRAVES:
-                oxytonized_token = macronized_token[:-1] + replace_grave_with_acute(macronized_token[-1])
+            oxytonized_token = ''
+            if not oxytonized_pass and macronized_token[-1] in GRAVES or macronized_token[-2:] in GRAVES: # e.g. στρατηγὸν
+                oxytonized_token = replace_grave_with_acute(macronized_token)
                 if not oxytonized_pass and replace_acute_with_grave(macronized_token) != macronized_token: # only bother with actual barytones, obviously
                     rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma))
                     macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
