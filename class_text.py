@@ -127,9 +127,9 @@ class Text:
                     if count_dichrona_in_open_syllables(orth) == 0:
                         logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
                         continue
-                    if not token.morph:
-                        logging.debug(f"\033{orth} has no morph. Appending morph as None.")
-                        token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, None])
+                    # if not token.morph:
+                    #     logging.debug(f"\033{orth} has no morph. Appending morph as None.")
+                    #     token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, None])
                     else:
                         token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
                     logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")

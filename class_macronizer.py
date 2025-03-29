@@ -4,7 +4,7 @@ import os
 import re
 import sqlite3
 
-from tqdm import tqdm as original_tqdm
+from tqdm import tqdm as tqdm
 
 from ascii import ascii_macronizer
 from barytone import replace_grave_with_acute, replace_acute_with_grave
@@ -13,16 +13,10 @@ from db.custom import custom_macronizer
 from db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from db.wiktionary_singletons import wiktionary_singletons_map
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import GRAVES, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, long_acute, lower_grc, upper_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, word_with_real_dichrona
+from grc_utils import only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 from greek_proper_names_cltk.proper_names import proper_names
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
-
-class tqdm(original_tqdm):
-    def __init__(self, *args, **kwargs):
-        if 'position' not in kwargs:
-            kwargs['position'] = 1  # Default to line 1 (0-based index)
-        super().__init__(*args, **kwargs)
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # e.g., 20250329_120059
 log_filename = f"diagnostics/macronizer_{timestamp}.log"
@@ -124,8 +118,14 @@ class Macronizer:
 
         text_object = Text(text, genre, doc_from_file=True, debug=self.debug)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
+
+        # lists to keep track of module efficacy
+        case_ending_recursion_results = []
             
-        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, is_lemma=False):
+        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False):
+            '''
+            I aim to have quite a lot of symmetry here, so it should be possible to change the order of modules without having to rewrite too many lines. 
+            '''
             
             recursion_depth += 1
             if recursion_depth > 10:
@@ -137,6 +137,8 @@ class Macronizer:
                 logging.debug(f'🔄 Macronizing (capitalized): {token} ({lemma}, {pos}, {morph})')
             elif decapitalized_pass:
                 logging.debug(f'🔄 Macronizing (decapitalized): {token} ({lemma}, {pos}, {morph})')
+            elif different_ending_pass:
+                logging.debug(f'🔄 Macronizing (different-ending): {token} ({lemma}, {pos}, {morph})')
             elif is_lemma:
                 logging.debug(f'🔄 Macronizing (lemma): {token} ({lemma}, {pos}, {morph})')
             else:
@@ -185,43 +187,117 @@ class Macronizer:
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
-
-
-
-            # ἴθε δή, let's recursively macronize remaining dichrona
-
-            # TODO We should also try macronizing prefixes by checking if what's left of them is still a word, e.g. ἀπο-κτενῶν => κτενῶν
             
-            # OXYTONIZING RECURSION
-            oxytonized_token = ''
-            if not oxytonized_pass and macronized_token[-1] in GRAVES or macronized_token[-2:] in GRAVES: # e.g. στρατηγὸν
+            # TODO PREFIXES
+            # We should also try macronizing prefixes by checking if what's left of them is still a word, e.g. ἀπο-κτενῶν => κτενῶν
+
+            # ἴθι δή, now let's *recursively* try to macronize the remaining dichrona!
+
+            ### WRONG-CASE-ENDING RECURSION ### e.g. πόλιν should go through πόλις
+
+            # 2nd declension
+            ''' 
+            Confirmed to yield στρα^τηγόν when having only "στρα^τηγός" in the db
+            '''
+            if not different_ending_pass and len(token) > 2 and only_bases(lemma[-2:]) == 'ος': # we enforce length for the last two chars to really be an ending (and for there to be dichrona)
+                logging.debug(f'\t Testing for wrong-case-ending recursion: {macronized_token} ({lemma})')
+                old_macronized_token = macronized_token
+                restored_token = ''
+
+                # cases only differing wrt the last char: gen and acc sing, and nom plur
+                if (only_bases(macronized_token[-2:]) == 'ου' and 'Gen' in morph.get("Case")) or (only_bases(macronized_token[-2:]) == 'ον' and 'Acc' in morph.get("Case")) or (only_bases(macronized_token[-2:]) == 'οι' and 'Nom' in morph.get("Case")):
+                    nominative_token = macronized_token[:-1] + 'ς'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-1] + macronized_token[-1]
+
+                # non-oxytone dative
+                elif macronized_token[-1] == 'ῳ' and 'Dat' in morph.get("Case"):
+                    nominative_token = macronized_token[:-1] + 'ος'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-1]
+
+                # oxytone dative
+                elif macronized_token[-1] == 'ῷ' and 'Dat' in morph.get("Case"):
+                    nominative_token = macronized_token[:-1] + 'ός'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-1]
+
+                # non-oxytone gen plur
+                elif macronized_token[-2:] == 'ων' and 'Gen' in morph.get("Case"):
+                    nominative_token = macronized_token[:-2] + 'ος'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-2:]
+                
+                # oxytone gen plur
+                elif macronized_token[-2:] == 'ῶν' and 'Gen' in morph.get("Case"):
+                    nominative_token = macronized_token[:-2] + 'ός'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-2:]
+
+                # non-oxytone dat plur
+                elif macronized_token[-3:] == 'οις' and 'Dat' in morph.get("Case"):
+                    nominative_token = macronized_token[:-3] + 'ος'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-3:]
+
+                # oxytone dat plur
+                elif macronized_token[-3:] == 'οῖς' and 'Dat' in morph.get("Case"):
+                    nominative_token = macronized_token[:-3] + 'ός'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-3:]
+                
+                # non-oxytone acc plur
+                elif macronized_token[-3:] == 'ους' and 'Acc' in morph.get("Case"):
+                    nominative_token = macronized_token[:-3] + 'ος'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-3:]
+
+                # oxytone acc plur
+                elif macronized_token[-3:] == 'ούς' and 'Acc' in morph.get("Case"):
+                    nominative_token = macronized_token[:-3] + 'ος'
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    restored_token = nominative_token[:-2] + macronized_token[-3:]
+
+                macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+
+                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    case_ending_recursion_results.append(macronized_token)
+                    logging.debug(f'\t✅ Wrong-case-ending helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                else:
+                    logging.debug(f'\t❌ Wrong-case-ending did not help')
+            
+            
+            ### OXYTONIZING RECURSION ###
+            if not oxytonized_pass and macronized_token[-1] in GRAVES or macronized_token[-2] in GRAVES: # e.g. στρατηγὸν
+                old_macronized_token = macronized_token
                 oxytonized_token = replace_grave_with_acute(macronized_token)
-                if not oxytonized_pass and replace_acute_with_grave(macronized_token) != macronized_token: # only bother with actual barytones, obviously
-                    rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma))
-                    macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
-                    if self.debug and rebarytonized_token != macronized_token:
-                        logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
-                    else:
-                        logging.debug(f'\t❌ Oxytonizing did not help')
+                rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma))
+                macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
+                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
+                else:
+                    logging.debug(f'\t❌ Oxytonizing did not help')
 
-            # CAPITALIZING RECURSION
-            if count_dichrona_in_open_syllables(macronized_token) > 0:
-                capitalized_token = upper_grc(macronized_token[0]) + macronized_token[1:]
-                if not capitalized_pass and not decapitalized_pass and pos == "PROPN" and macronized_token != capitalized_token: # if the token is an all lowercase proper noun, try capitalizing it
-                    if self.debug:
-                        logging.debug(f'\t Capitalizing {macronized_token} as {capitalized_token}')
-                    old_macronized_token = macronized_token
-                    capitalized_token = macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
-                    restored_token = old_macronized_token[0] + capitalized_token[1:] # restore the original first character
-                    logging.debug(f'\t Restoring capitalized token: {capitalized_token} => {restored_token}')
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
 
-                    macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
-                    if self.debug and macronized_token != old_macronized_token:
-                        logging.debug(f'\t✅ Capitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-                    else:
-                        logging.debug(f'\t❌ Capitalization did not help')
+            ### CAPITALIZING RECURSION ###
+            # if not capitalized_pass and not decapitalized_pass and pos == "PROPN" and macronized_token[0] in VOWELS_LOWER_TO_UPPER.keys():
+            #     capitalized_token = upper_grc(macronized_token[0]) + macronized_token[1:]
+            #     if self.debug:
+            #         logging.debug(f'\t \033Capitalizing {macronized_token} as {capitalized_token}')
+            #     old_macronized_token = macronized_token
+            #     capitalized_token = macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
+            #     restored_token = old_macronized_token[0] + capitalized_token[1:] # restore the original first character
+            #     logging.debug(f'\t Restoring capitalized token: {capitalized_token} => {restored_token}')
 
-            # DECAPITALIZING RECURSION
+            #     macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+            #     if self.debug and count_dichrona_in_open_syllables(macronized_token) != count_dichrona_in_open_syllables(old_macronized_token):
+            #         logging.debug(f'\t✅ Capitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+            #     else:
+            #         logging.debug(f'\t❌ Capitalization did not help')
+
+            ### DECAPITALIZING RECURSION ###
             # if count_dichrona_in_open_syllables(macronized_token) > 0:
             #     decapitalized_token = lower_grc(macronized_token[0]) + macronized_token[1:]
             #     if not capitalized_pass and not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
@@ -236,7 +312,7 @@ class Macronizer:
             #         elif self.debug:
             #             logging.debug(f'\t❌ Decapitalization did not help')
 
-            # LEMMA-BASED GENERALIZATION RECURSION
+            ### LEMMA-BASED GENERALIZATION RECURSION ###
             if count_dichrona_in_open_syllables(macronized_token) > 0:
                 decapitalized_token = lower_grc(token.replace('^', ''))
                 if not is_lemma and not decapitalized_token == lemma: # if the token is capitalized and is the lemma itself, we get infinite recursion
@@ -251,7 +327,7 @@ class Macronizer:
 
         macronized_tokens = []
         still_ambiguous = []
-        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens"):
+        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens", leave=True):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
             if count_dichrona_in_open_syllables(result) > 0:
@@ -264,6 +340,14 @@ class Macronizer:
         if stats:
             self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
         
+        # MODULE EFFICACY LISTS
+
+        with open('diagnostics/modules/case_recursion.txt', 'w', encoding='utf-8') as f:
+            for word in case_ending_recursion_results:
+                f.write(f'{word}\n')
+
+        # STILL_AMBIGUOUS
+
         file_version = 1
         file_stub = ''
         file_name = ''
@@ -384,7 +468,7 @@ class Macronizer:
         assert not macronized_diphthong(merged), f"Watch out! We just macronized a diphthong: {merged}"
         return merged
     
-    def lemma_generalization(self, macronized_token, lemma_token):
+    def lemma_generalization(self, macronized_token, lemma):
         """
         Take a deep breath and focus. 
         This is probably the one module with the greatest potential for optimization, given enough ingenuity.

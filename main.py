@@ -1,4 +1,11 @@
 import sys
+from tqdm import tqdm as original_tqdm
+
+class tqdm(original_tqdm):
+    def __init__(self, *args, **kwargs):
+        if 'position' not in kwargs:
+            kwargs['position'] = 1  # Default to line 1 (0-based index)
+        super().__init__(*args, **kwargs)
 
 from halo import Halo
 
