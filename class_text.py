@@ -15,15 +15,6 @@ from grc_utils import base_alphabet, count_dichrona_in_open_syllables, lower_grc
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
 
-def get_capital_positions(text):
-    capital_positions = []
-
-    for i, char in enumerate(text):
-        if char != lower_grc(char): # my definition of a capital letter (because lower_grc is using a defaulting .get)
-            capital_positions.append(i)
-            
-    return capital_positions
-
 def malformed(word):
     '''
     Filters out words without any diacritics.
@@ -76,8 +67,6 @@ class Text:
 
         diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
-        self.capital_positions = get_capital_positions(before_odycy)
-
         sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
             logging.debug(f'Split input into {len(sentence_list)} sentences.')
@@ -99,7 +88,7 @@ class Text:
             docs = list(doc_bin.get_docs(nlp.vocab))
         else:
             nlp = grc_odycy_joint_trf.load()
-            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list)))
+            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
             doc_bin = DocBin()
             for doc in docs:
                 doc_bin.add(doc)
@@ -154,8 +143,7 @@ class Text:
 
     def integrate(self):
         """
-        Integrates the macronized words back into the original text, 
-        while recapitalizing words that have been lowered by odyCy. 
+        Integrates the macronized words back into the original text.
         """
         result_text = self.text # making a working copy
         macronized_words = [word for word in self.macronized_words if word is not None and any(macron in word for macron in ['_', '^'])]
@@ -164,9 +152,8 @@ class Text:
         
         replacements = [] # going to be a list of triples: (starting position, ending position, macronized word)
         
-        for macronized_word in tqdm(macronized_words, desc="Finding replacements"):
+        for macronized_word in tqdm(macronized_words, desc="Finding replacements", leave=False):
             normalized_word = normalize_word(macronized_word.replace('_', '').replace('^', ''))
-            #normalized_word = make_only_greek(normalized_word)
             
             if not normalized_word:
                 continue
@@ -179,27 +166,17 @@ class Text:
             # Find all matches of the normalized word in the original text
             matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
             
+            if normalized_word == "Διὰ":
+                logging.debug(f"BUG Matches for '{normalized_word}': {[match.group() for match in matches]}")
+
             if current_count >= len(matches):
                 raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
-                # NOTE Skipping capitalization for now, it caused bugs like changing 'ντο. Μετὰ ταῦτα Κῦρο' to 'ντο. Μετὰ Ταῦτα Κῦρο'
-                # And I think we already fixed the origin of the worst capitalization problem in the first place?
-                # If we can't find the nth occurrence, try capitalizing the first letter
-                #capitalized_word = upper_grc(normalized_word[0]) + normalized_word[1:]
-                #matches = list(re.finditer(fr"\b{capitalized_word}\b", self.text))
-                #if current_count >= len(matches):
-                #    raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}' or '{capitalized_word}'")
-                #normalized_word = capitalized_word  # Update normalized_word to the capitalized version
             
             target_match = matches[current_count]
             # .start() and .end() are methods of a regex Match object, giving the start and end indices of the match
             # NOTE TO SELF TO REMEMBER: .start() is inclusive, while .end() is *exclusive*, meaning .end() returns the index of the first character *just after* the match
             start_pos = target_match.start()
             end_pos = target_match.end()
-            
-            # Check if the word at start_pos should be capitalized based on self.capital_positions
-            if start_pos in self.capital_positions:
-                # Capitalize the first character of the macronized word
-                macronized_word = upper_grc(macronized_word[0]) + macronized_word[1:]
             
             replacements.append((start_pos, end_pos, macronized_word))
             

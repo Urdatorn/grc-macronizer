@@ -439,24 +439,25 @@ class Macronizer:
             logging.debug("\nRemoving proper names...")
             text = remove_proper_names(text)
 
+        print("### STATS ###")
+
         count_before = 0
         count_after = 0
 
         if not count_all_dichrona:
-            print("\nCounting ambiguous dichrona...")
             count_before = count_ambiguous_dichrona_in_open_syllables(text)
             count_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
-            print(f"Dichrona in open syllables not covered by accent rules before: {count_before}")
-            print(f"Dichrona in open syllables not covered by accent rules after: {count_after}")
+            print(f"Dichrona in open syllables not covered by accent rules before: \t{count_before}")
+            print(f"Dichrona in open syllables not covered by accent rules after: \t{count_after}")
         else:
             count_before = count_dichrona_in_open_syllables(text)
             count_after = count_dichrona_in_open_syllables(macronized_text)
-            print(f"Dichrona in open syllables before: {count_before}")
-            print(f"Unmacronized dichrona in open syllables left: {count_after}")
+            print(f"Dichrona in open syllables before: \t{count_before}")
+            print(f"Unmacronized dichrona in open syllables left: \t{count_after}")
             
         difference = count_before - count_after
 
-        print(f"{difference} dichrona macronized.")
+        print(f"\033[31m{difference}\033[0m dichrona macronized.")
 
         ratio = difference / count_before if count_before > 0 else 0
 
