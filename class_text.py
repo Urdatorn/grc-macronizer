@@ -6,7 +6,8 @@ import warnings
 import re
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-from epic_stop_words import epic_stop_words
+from stop_list import stop_list
+from stop_list_epic import epic_stop_words
 from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
 from format_macrons import merge_or_overwrite_markup
@@ -105,6 +106,9 @@ class Text:
                 if token.orth_ and token.lemma_ and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs
                     orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
                     logging.debug(f"\t'Orth' token: {orth}")
+                    if orth in stop_list:
+                        logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
+                        continue
                     if genre == 'epic' and orth in epic_stop_words:
                         logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
                         continue

@@ -191,6 +191,13 @@ class Macronizer:
             # TODO PREFIXES
             # We should also try macronizing prefixes by checking if what's left of them is still a word, e.g. ἀπο-κτενῶν => κτενῶν
 
+            # TODO Recursively handle tokens with >1 accent, like Καλλίμαχός, by removing the last one.
+            # Tricky thing is we only want to remove the accenta 
+
+            # TODO Recursively handle elided words like παρ'
+            # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
+            # In that case we could simply search for the lemma and then merge.
+
             # ἴθι δή, now let's *recursively* try to macronize the remaining dichrona!
 
             # Example of working two-level recursion:
@@ -374,7 +381,7 @@ class Macronizer:
 
         macronized_tokens = []
         still_ambiguous = []
-        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens", leave=True):
+        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=True):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
             if count_dichrona_in_open_syllables(result) > 0:
@@ -394,6 +401,8 @@ class Macronizer:
                 f.write(f'{word}\n')
 
         # STILL_AMBIGUOUS
+
+        still_ambiguous = set(still_ambiguous)
 
         file_version = 1
         file_stub = ''
@@ -439,7 +448,7 @@ class Macronizer:
             logging.debug("\nRemoving proper names...")
             text = remove_proper_names(text)
 
-        print("### STATS ###")
+        print("###### STATS ######")
 
         count_before = 0
         count_after = 0
@@ -447,21 +456,21 @@ class Macronizer:
         if not count_all_dichrona:
             count_before = count_ambiguous_dichrona_in_open_syllables(text)
             count_after = count_ambiguous_dichrona_in_open_syllables(macronized_text)
-            print(f"Dichrona in open syllables not covered by accent rules before: \t{count_before}")
+            print(f"Dichrona in open syllables not covered by accent rules before: \t\t\t{count_before}")
             print(f"Dichrona in open syllables not covered by accent rules after: \t{count_after}")
         else:
             count_before = count_dichrona_in_open_syllables(text)
             count_after = count_dichrona_in_open_syllables(macronized_text)
-            print(f"Dichrona in open syllables before: \t{count_before}")
-            print(f"Unmacronized dichrona in open syllables left: \t{count_after}")
+            print(f"Dichrona in open syllables before:            {count_before}")
+            print(f"Unmacronized dichrona in open syllables left: {count_after}")
             
         difference = count_before - count_after
 
-        print(f"\033[31m{difference}\033[0m dichrona macronized.")
+        print(f"\n\033[32m{difference}\033[0m dichrona macronized.")
 
         ratio = difference / count_before if count_before > 0 else 0
 
-        print(f"Macronization ratio: {ratio:.2%}")
+        print(f"\nMacronization ratio: \033[32m{ratio:.2%}\033[0m")
 
         return ratio
     
