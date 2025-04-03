@@ -242,6 +242,7 @@ class Macronizer:
                                   'παρα': 'πα^ρα^',
                                   'περι': 'περι^',
                                   'συν': 'συ^ν',
+                                  'συμ': 'συ^μ',
                                   'ὑπερ': 'ὑ^περ',
                                   'ὑπο': 'ὑ^πο',
                                   'ὑφ': 'ὑ^φ',
@@ -475,6 +476,8 @@ class Macronizer:
                 still_ambiguous.append(result)
             macronized_tokens.append(result)
 
+        logging.info(f'\n\n### END OF MACRONIZATION ###\n\n')
+
         text_object.macronized_words = macronized_tokens
         text_object.integrate() # creates the final .macronized_text
 
@@ -482,6 +485,25 @@ class Macronizer:
             self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
         
         # MODULE EFFICACY LISTS
+
+        results_dict = {
+            "wiktionary_results": wiktionary_results,
+            "hypotactic_results": hypotactic_results,
+            "lsj_results": lsj_results,
+            "nominal_forms_results": nominal_forms_results,
+            "verbal_forms_results": verbal_forms_results,
+            "accent_rules_results": accent_rules_results,
+            "prefix_results": prefix_results,
+            "lemma_generalization_results": lemma_generalization_results,
+            "custom_results": custom_results,
+            "case_ending_recursion_results": case_ending_recursion_results,
+        }
+
+        for name, result_list in results_dict.items():
+            logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
+            with open(f'diagnostics/modules/{name}.txt', 'w', encoding='utf-8') as f:
+                for word in result_list:
+                    f.write(f'{word}\n')
 
         with open('diagnostics/modules/case_recursion.txt', 'w', encoding='utf-8') as f:
             for word in case_ending_recursion_results:
@@ -514,8 +536,6 @@ class Macronizer:
                 for item in still_ambiguous:
                     f.write(f'    {repr(item)},\n')
                 f.write(']\n')
-
-        logging.debug(f'\n\n ### END OF MACRONIZATION ###\n\n')
 
         return text_object.macronized_text
     

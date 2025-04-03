@@ -16,6 +16,10 @@ from grc_utils import base_alphabet, count_dichrona_in_open_syllables, lower_grc
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
 
+
+logger = logging.getLogger()  # Root logger
+print(logger.handlers)
+
 def malformed(word):
     '''
     Filters out words without any diacritics.
