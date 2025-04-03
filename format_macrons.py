@@ -2,6 +2,7 @@
 Tread carefully. This is a minefield of Unicode normalization and combining characters.
 '''
 
+import logging
 import unicodedata
 
 from grc_utils import macrons_map, normalize_word
@@ -170,8 +171,16 @@ def merge_or_overwrite_markup(new_version, old_version, precedence='new'):
     >>> merge_or_overwrite_markup('st_ring^', 's_t^ring^')
     's_t_ring^'
     '''
-    if not new_version or not old_version:
-        return new_version or old_version
+
+    if not new_version:
+        logging.debug('No new version, returning old version')
+        return old_version
+    if not old_version:
+        logging.debug('No old version, returning new version')
+        return new_version
+    
+    assert normalize_word(new_version.replace('^', '').replace('_', '')) == normalize_word(old_version.replace('^', '').replace('_', '')), \
+        f'Cannot merge markup on different words: {new_version} vs {old_version}'
     
     # First, get base string without markup
     base = ''.join(c for c in new_version if c not in '^_')

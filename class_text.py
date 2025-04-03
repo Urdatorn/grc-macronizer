@@ -132,7 +132,7 @@ class Text:
         logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[:10][0]}')
         logging.info(f'odyCy fail count: {fail_counter}')
 
-        self.text = text
+        self.text = before_odycy # important: this is the cleaned text, without [, ], etc. If we try to integrate into the original text, we will get a lot of silent bugs or errors.
         self.genre = genre
         self.docs = docs
         self.token_lemma_pos_morph = token_lemma_pos_morph

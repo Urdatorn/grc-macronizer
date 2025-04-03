@@ -1,6 +1,8 @@
+from collections import Counter
 from datetime import datetime
 import logging
 import os
+import pickle
 import re
 import sqlite3
 
@@ -15,11 +17,12 @@ from db.wiktionary_singletons import wiktionary_singletons_map
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
 from grc_utils import only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 from greek_proper_names_cltk.proper_names import proper_names
+from db.lsj import lsj
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # e.g., 20250329_120059
-log_filename = f"diagnostics/macronizer_{timestamp}.log"
+log_filename = f"diagnostics/logs/macronizer_{timestamp}.log"
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -36,6 +39,12 @@ diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
 adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅἂἃἤἥἣἢἦἧἆἇὧὦ]ι'
 
 combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
+
+with open("db/lsj_keys.pkl", "rb") as f:
+    lsj_keys = pickle.load(f)
+
+# Convert lsj_keys to a set for faster lookups
+lsj_keys_set = {only_bases(key) for key in lsj_keys}
 
 def macronized_diphthong(word):
     '''
@@ -107,6 +116,7 @@ class Macronizer:
         where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
             [wiktionary]
             [hypotactic]
+            [lsj]
             [nominal forms] # needs to be moved here from Text
             [verbal forms]
             [accent rules]
@@ -120,9 +130,18 @@ class Macronizer:
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of module efficacy
+        wiktionary_results = []
+        hypotactic_results = []
+        lsj_results = []
+        nominal_forms_results = []
+        verbal_forms_results = []
+        accent_rules_results = []
+        prefix_results = []
+        lemma_generalization_results = []
+        custom_results = []
         case_ending_recursion_results = []
             
-        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False):
+        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False):
             '''
             I aim to have quite a lot of symmetry here, so it should be possible to change the order of modules without having to rewrite too many lines. 
             '''
@@ -154,6 +173,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(custom_token, macronized_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
+                custom_results.append(macronized_token)
                 return macronized_token
 
             wiktionary_token = self.wiktionary(macronized_token, lemma, pos, morph)
@@ -162,6 +182,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(wiktionary_token, macronized_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
+                wiktionary_results.append(macronized_token)
                 return macronized_token
 
             hypotactic_token = self.hypotactic(macronized_token)
@@ -170,6 +191,19 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
+                hypotactic_results.append(macronized_token)
+                return macronized_token
+            
+            lsj_token = lsj.get(token, token)
+            if normalize_word(lsj_token.replace('^', '').replace('_', '')) == normalize_word(token.replace('^', '').replace('_', '')): # There are some accent bugs in the lsj db. Better safe than sorry
+                if lsj_token == token:
+                    logging.debug(f'\t❌ LSJ did not help')
+                else:
+                    logging.debug(f'\t✅ LSJ: {token} => {lsj_token}, with {count_dichrona_in_open_syllables(lsj_token)} left')
+                    macronized_token = merge_or_overwrite_markup(lsj_token, macronized_token)
+
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                lsj_results.append(macronized_token)
                 return macronized_token
 
             nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
@@ -188,17 +222,67 @@ class Macronizer:
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
             
-            # TODO PREFIXES
-            # We should also try macronizing prefixes by checking if what's left of them is still a word, e.g. ἀπο-κτενῶν => κτενῶν
+            ### PREFIXES ###
+            '''
+            If the word's lemma minus a prefix string is still an LSJ entry, then we macronize the prefix.
+            Example: ἀφίκοντο can be macronized to ἀ^φίκοντο because ικνεομαι is LSJ
+            '''
+            dichronic_prefixes = {'ἀνα': 'ἀ^να^', 
+                                  #'ἀν': 'ἀ^ν', # e.g. ἀν-ειλέω 
+                                  'ἀντι': 'ἀντι^',
+                                  'ἀπο': 'ἀ^πο',
+                                  #'ἀπ': 'ἀ^π',
+                                  'ἀφ': 'ἀ^φ',
+                                  'δια': 'δι^α^',
+                                  #'δι': 'δι^', # e.g. δι-έχω
+                                  'ἐπι': 'ἐπι^',
+                                  'κατα': 'κα^τα^',
+                                  'καθ': 'κα^θ',
+                                  'μετα': 'μετα^',
+                                  'παρα': 'πα^ρα^',
+                                  'περι': 'περι^',
+                                  'συν': 'συ^ν',
+                                  'ὑπερ': 'ὑ^περ',
+                                  'ὑπο': 'ὑ^πο',
+                                  'ὑφ': 'ὑ^φ',
+            }
+            for prefix, macronized_prefix in dichronic_prefixes.items():
+                if token.startswith(prefix) and lemma.startswith(prefix):
+                    old_macronized_token = macronized_token
+                    unprefixed_lemma = lemma.removeprefix(prefix) # cool python 3.9 method!
+                    unprefixed_lemma = only_bases(unprefixed_lemma)
+                    logging.debug(f'\t Unprefixed lemma for {token}: {unprefixed_lemma}')
+                    
+                    # Use set lookup instead of iterating over lsj_keys
+                    if unprefixed_lemma in lsj_keys_set:
+                        prefix_token = token.removeprefix(prefix)
+                        prefix_token = macronized_prefix + prefix_token
+                        prefix_token = normalize_word(prefix_token)
+                        logging.debug(f'\t Prefix token for {token}: {prefix_token}')
+
+                        macronized_token = merge_or_overwrite_markup(prefix_token, macronized_token)
+                        if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                            prefix_results.append(macronized_token)
+                            logging.debug(f'\t✅ Prefix macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                        else:
+                            logging.debug(f'\t❌ Prefix macronization did not help')
+
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
+
+            #################
+            ### RECURSION ###
+            #################
 
             # TODO Recursively handle tokens with >1 accent, like Καλλίμαχός, by removing the last one.
-            # Tricky thing is we only want to remove the accenta 
+            # Tricky thing is we only want to remove the accent
+
+            # if not double_accent_pass:
+            #     if 
 
             # TODO Recursively handle elided words like παρ'
             # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
             # In that case we could simply search for the lemma and then merge.
-
-            # ἴθι δή, now let's *recursively* try to macronize the remaining dichrona!
 
             # Example of working two-level recursion:
                 # 2025-03-30 11:39:44,565 - 🔄 Macronizing: Διὰ (διά, ADP, )
@@ -317,8 +401,9 @@ class Macronizer:
             ### OXYTONIZING RECURSION ###
             if not oxytonized_pass and macronized_token[-1] in GRAVES or macronized_token[-2] in GRAVES: # e.g. στρατηγὸν
                 old_macronized_token = macronized_token
-                oxytonized_token = replace_grave_with_acute(macronized_token)
-                rebarytonized_token = replace_acute_with_grave(macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma))
+                oxytonized_token = replace_grave_with_acute(old_macronized_token)
+                oxytonized_token = macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
+                rebarytonized_token = replace_acute_with_grave(oxytonized_token)
                 macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                 if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -347,7 +432,7 @@ class Macronizer:
             #         logging.debug(f'\t❌ Capitalization did not help')
 
             ### DECAPITALIZING RECURSION ### Useful because many editions capitalize the first word of a sentence or section!
-            if count_dichrona_in_open_syllables(macronized_token) > 0:
+            if count_dichrona_in_open_syllables(macronized_token) > 0 and token[0] in VOWELS_LOWER_TO_UPPER.values():
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
                 if not capitalized_pass and not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
@@ -374,8 +459,10 @@ class Macronizer:
             #         if self.debug:
             #             logging.debug(f'\t✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
 
+            macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
+            token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
             assert not macronized_diphthong(macronized_token), f"Watch out! We just macronized a diphthong: {macronized_token}"
-            assert normalize_word(macronized_token.replace("^", "").replace("_", "")) == normalize_word(token.replace("^", "").replace("_", "")), f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token}"
+            assert macronized_normalized_for_checking == token_normalized_for_checking, f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace("^", "").replace("_", "")}"
 
             return macronized_token
 
@@ -410,9 +497,9 @@ class Macronizer:
 
         if len(macronized_tokens) > 0:
             if macronized_tokens[0]:
-                file_stub = f'diagnostics/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
+                file_stub = f'diagnostics/still_ambiguous/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
             else:
-                file_stub = f'diagnostics/still_ambiguous'
+                file_stub = f'diagnostics/still_ambiguous/still_ambiguous'
 
             while True:
                 file_version = str(file_version)
