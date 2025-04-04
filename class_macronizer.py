@@ -15,7 +15,7 @@ from db.custom import custom_macronizer
 from db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from db.wiktionary_singletons import wiktionary_singletons_map
 from format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
-from grc_utils import only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
+from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 from greek_proper_names_cltk.proper_names import proper_names
 from db.lsj import lsj
 from morph_disambiguator import morph_disambiguator
@@ -139,6 +139,7 @@ class Macronizer:
         prefix_results = []
         lemma_generalization_results = []
         custom_results = []
+        double_accent_recursion_results = []
         case_ending_recursion_results = []
             
         def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False):
@@ -225,49 +226,72 @@ class Macronizer:
             ### PREFIXES ###
             '''
             If the word's lemma minus a prefix string is still an LSJ entry, then we macronize the prefix.
-            Example: ἀφίκοντο can be macronized to ἀ^φίκοντο because ικνεομαι is LSJ
+            Example: ἀφίκοντο can be macronized to ἀ^φίκοντο because ικνεομαι is in LSJ
             '''
-            dichronic_prefixes = {'ἀνα': 'ἀ^να^', 
-                                  #'ἀν': 'ἀ^ν', # e.g. ἀν-ειλέω 
-                                  'ἀντι': 'ἀντι^',
-                                  'ἀπο': 'ἀ^πο',
-                                  #'ἀπ': 'ἀ^π',
-                                  'ἀφ': 'ἀ^φ',
-                                  'δια': 'δι^α^',
-                                  #'δι': 'δι^', # e.g. δι-έχω
-                                  'ἐπι': 'ἐπι^',
-                                  'κατα': 'κα^τα^',
-                                  'καθ': 'κα^θ',
-                                  'μετα': 'μετα^',
-                                  'παρα': 'πα^ρα^',
-                                  'περι': 'περι^',
-                                  'συν': 'συ^ν',
-                                  'ξυν': 'ξυ^ν',
-                                  'συμ': 'συ^μ',
-                                  'ὑπερ': 'ὑ^περ',
-                                  'ὑπο': 'ὑ^πο',
-                                  'ὑφ': 'ὑ^φ',
+            dichronic_prefixes = {
+                                'ἀνα': 'ἀ^να^', 
+                                'ἀντι': 'ἀντι^',
+                                'ἀπο': 'ἀ^πο',
+                                'ἀφ': 'ἀ^φ',
+                                'δια': 'δι^α^',
+                                'ἐπι': 'ἐπι^',
+                                'κατα': 'κα^τα^',
+                                'καθ': 'κα^θ',
+                                'μετα': 'μετα^',
+                                'παρα': 'πα^ρα^',
+                                'περι': 'περι^',
+                                'συν': 'συ^ν',
+                                'ξυν': 'ξυ^ν',
+                                'συμ': 'συ^μ',
+                                'ὑπερ': 'ὑ^περ',
+                                'ὑπο': 'ὑ^πο',
+                                'ὑφ': 'ὑ^φ',
             }
+
+            dichronic_prefixes_unaspirated_elision = { # these need to be checked after the above since they are substrings of some of them
+                                'ἀν': 'ἀ^ν', # e.g. ἀν-ειλέω 
+                                'ἀπ': 'ἀ^π',
+                                'δι': 'δι^', # e.g. δι-έχω
+                                'κατ': 'κα^τ',
+                                'ὑπ': 'ὑ^π'
+            }
+
+            prefix_match = ''
+            macronized_prefix_match = ''
+            unprefixed_lemma = ''
+            old_macronized_token = macronized_token
             for prefix, macronized_prefix in dichronic_prefixes.items():
                 if token.startswith(prefix) and lemma.startswith(prefix):
-                    old_macronized_token = macronized_token
+                    prefix_match = prefix
+                    macronized_prefix_match = macronized_prefix
+
                     unprefixed_lemma = lemma.removeprefix(prefix) # cool python 3.9 method!
                     unprefixed_lemma = only_bases(unprefixed_lemma)
                     logging.debug(f'\t Unprefixed lemma for {token}: {unprefixed_lemma}')
-                    
-                    # Use set lookup instead of iterating over lsj_keys
-                    if unprefixed_lemma in lsj_keys_set:
-                        prefix_token = token.removeprefix(prefix)
-                        prefix_token = macronized_prefix + prefix_token
-                        prefix_token = normalize_word(prefix_token)
-                        logging.debug(f'\t Prefix token for {token}: {prefix_token}')
+                    break
+                
+            for prefix, macronized_prefix in dichronic_prefixes_unaspirated_elision.items():
+                if token.startswith(prefix) and lemma.startswith(prefix):
+                    prefix_match = prefix
+                    macronized_prefix_match = macronized_prefix
 
-                        macronized_token = merge_or_overwrite_markup(prefix_token, macronized_token)
-                        if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
-                            prefix_results.append(macronized_token)
-                            logging.debug(f'\t✅ Prefix macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-                        else:
-                            logging.debug(f'\t❌ Prefix macronization did not help')
+                    unprefixed_lemma = lemma.removeprefix(prefix) # cool python 3.9 method!
+                    unprefixed_lemma = only_bases(unprefixed_lemma)
+                    logging.debug(f'\t Unprefixed lemma for {token}: {unprefixed_lemma}')
+                    break
+
+            if unprefixed_lemma in lsj_keys_set:
+                prefix_token = token.removeprefix(prefix_match)
+                prefix_token = macronized_prefix_match + prefix_token
+                prefix_token = normalize_word(prefix_token)
+                logging.debug(f'\t Prefix token for {token}: {prefix_token}')
+
+                macronized_token = merge_or_overwrite_markup(prefix_token, macronized_token)
+                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    prefix_results.append(macronized_token)
+                    logging.debug(f'\t✅ Prefix macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                else:
+                    logging.debug(f'\t❌ Prefix macronization did not help')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
@@ -276,15 +300,41 @@ class Macronizer:
             ### RECURSION ###
             #################
 
-            # TODO Recursively handle tokens with >1 accent, like Καλλίμαχός, by removing the last one.
-            # Tricky thing is we only want to remove the accent
+            ### DOUBLE-ACCENT RECURSION ###
 
-            # if not double_accent_pass:
-            #     if 
+            '''
+            Recursively handle paroxytone or properispomenon tokens with >1 accent, like Καλλίμαχός or οἷός or πράγματά.
+            # NOTE that if follows that such tokens cannot have final long, and so no risk of loosing iota subscript.
+            Hence we should be able to safely use only_bases().
+            # NOTE that what we need to handle is just that final accent can be on *the last or next to last syllable*. 
+            '''
+
+            if not double_accent_pass:
+                accents = [char for char in token if char in ACCENTS]
+                if len(accents) > 1:
+                    οne_accent_token = ''
+                    old_macronized_token = macronized_token
+
+                    if token[-1] in ACCENTS:
+                        one_accent_token = token[:-1] + only_bases(token[-1])
+                    if token[-2] in ACCENTS:
+                        one_accent_token = token[:-2] + only_bases(token[-2:])
+                    
+                    one_accent_token = macronization_modules(one_accent_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
+                    logging.debug(f'\t One-accent token macronized: {one_accent_token}')
+                    macronized_token = merge_or_overwrite_markup(one_accent_token, macronized_token)
+                    if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                        double_accent_recursion_results.append(macronized_token)
+                        logging.debug(f'\t✅ Double accent macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                    else:
+                        logging.debug(f'\t❌ Double accent macronization did not help')
+                    
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
+                return macronized_token
 
             # TODO Recursively handle elided words like παρ'
             # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
-            # In that case we could simply search for the lemma and then merge.
+            # In that case we could simply search for the lemma and then merge lemma[:-1].
 
             # Example of working two-level recursion:
                 # 2025-03-30 11:39:44,565 - 🔄 Macronizing: Διὰ (διά, ADP, )
@@ -497,6 +547,7 @@ class Macronizer:
             "prefix_results": prefix_results,
             "lemma_generalization_results": lemma_generalization_results,
             "custom_results": custom_results,
+            "double_accent_recursion_results": double_accent_recursion_results,
             "case_ending_recursion_results": case_ending_recursion_results,
         }
 
