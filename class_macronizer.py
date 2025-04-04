@@ -142,7 +142,7 @@ class Macronizer:
         double_accent_recursion_results = []
         case_ending_recursion_results = []
             
-        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False):
+        def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False, reversed_elision_pass=False):
             '''
             I aim to have quite a lot of symmetry here, so it should be possible to change the order of modules without having to rewrite too many lines. 
             '''
@@ -253,6 +253,7 @@ class Macronizer:
                                 'ἀπ': 'ἀ^π',
                                 'δι': 'δι^', # e.g. δι-έχω
                                 'κατ': 'κα^τ',
+                                'παρ': 'πα^ρ',
                                 'ὑπ': 'ὑ^π'
             }
 
@@ -300,6 +301,17 @@ class Macronizer:
             ### RECURSION ###
             #################
 
+            '''
+            # Example of working two-level recursion:
+                # 2025-03-30 11:39:44,565 - 🔄 Macronizing: Διὰ (διά, ADP, )
+                # 2025-03-30 11:39:44,565 - 🔄 Macronizing (oxytonized): Διά (διά, ADP, )
+                # 2025-03-30 11:39:44,566 - 	 Decapitalizing Διά as διά
+                # 2025-03-30 11:39:44,566 - 🔄 Macronizing (oxytonized): διά (διά, ADP, )
+                # 2025-03-30 11:39:44,566 - 	✅ Custom: διά => δι^ά^, with 0 left
+                # 2025-03-30 11:39:44,566 - 	✅ Decapitalization helped: 0 left
+                # 2025-03-30 11:39:44,567 - 	✅ Oxytonizing helped: : 0 left
+            '''
+
             ### DOUBLE-ACCENT RECURSION ###
 
             '''
@@ -312,17 +324,33 @@ class Macronizer:
             if not double_accent_pass:
                 accents = [char for char in token if char in ACCENTS]
                 if len(accents) > 1:
-                    οne_accent_token = ''
+                    one_accent_token_last = ''
+                    one_accent_token_next_to_last = ''
+                    reconstituted_token = ''
                     old_macronized_token = macronized_token
 
                     if token[-1] in ACCENTS:
-                        one_accent_token = token[:-1] + only_bases(token[-1])
+                        one_accent_token_last = token[:-1] + only_bases(token[-1])
                     if token[-2] in ACCENTS:
-                        one_accent_token = token[:-2] + only_bases(token[-2:])
+                        one_accent_token_next_to_last = token[:-2] + only_bases(token[-2:])
                     
-                    one_accent_token = macronization_modules(one_accent_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
-                    logging.debug(f'\t One-accent token macronized: {one_accent_token}')
-                    macronized_token = merge_or_overwrite_markup(one_accent_token, macronized_token)
+                    if one_accent_token_last:
+                        one_accent_token_last = macronization_modules(one_accent_token_last, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
+                        logging.debug(f'\t One-accent token macronized (last): {one_accent_token_last}')
+                        if one_accent_token_last[-1] == '^' or one_accent_token_last[-1] == '_':
+                            reconstituted_token = one_accent_token_last[:-2] + token[-1] + one_accent_token_last[-1]
+                        else:
+                            reconstituted_token = one_accent_token_last[:-1] + token[-1]
+                    
+                    if one_accent_token_next_to_last:
+                        one_accent_token_next_to_last = macronization_modules(one_accent_token_next_to_last, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
+                        logging.debug(f'\t One-accent token macronized (next to last): {one_accent_token_next_to_last}')
+                        if one_accent_token_next_to_last[-2] == '^' or one_accent_token_next_to_last[-1] == '_':
+                            reconstituted_token = one_accent_token_next_to_last[:-3] + token[-2] + one_accent_token_next_to_last[-2] + token[-1]
+                        else:
+                            reconstituted_token = one_accent_token_next_to_last[:-2] + token[-2:]
+                        
+                    macronized_token = merge_or_overwrite_markup(reconstituted_token, macronized_token)
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         double_accent_recursion_results.append(macronized_token)
                         logging.debug(f'\t✅ Double accent macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -332,30 +360,22 @@ class Macronizer:
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
+            ### REVERSED-ELISION RECURSION ###
+
+            '''
             # TODO Recursively handle elided words like παρ'
             # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
             # In that case we could simply search for the lemma and then merge lemma[:-1].
+            '''
 
-            # Example of working two-level recursion:
-                # 2025-03-30 11:39:44,565 - 🔄 Macronizing: Διὰ (διά, ADP, )
-                # 2025-03-30 11:39:44,565 - 	❌ Custom did not help
-                # 2025-03-30 11:39:44,565 - 	✅ Wiktionary: Διὰ => Διὰ, with 2 left
-                # 2025-03-30 11:39:44,565 - 	✅ Hypotactic: Διὰ => Διὰ, with 2 left
-                # 2025-03-30 11:39:44,565 - 	✅ Nominal forms: Διὰ => Διὰ, with 2 left
-                # 2025-03-30 11:39:44,565 - 	✅ Accent rules: Διὰ => Διὰ, with 2 left
-                # 2025-03-30 11:39:44,565 - 🔄 Macronizing (oxytonized): Διά (διά, ADP, )
-                # 2025-03-30 11:39:44,565 - 	❌ Custom did not help
-                # 2025-03-30 11:39:44,566 - 	✅ Wiktionary: Διά => Διά, with 2 left
-                # 2025-03-30 11:39:44,566 - 	✅ Hypotactic: Διά => Διά, with 2 left
-                # 2025-03-30 11:39:44,566 - 	✅ Nominal forms: Διά => Διά, with 2 left
-                # 2025-03-30 11:39:44,566 - 	✅ Accent rules: Διά => Διά, with 2 left
-                # 2025-03-30 11:39:44,566 - 	 Decapitalizing Διά as διά
-                # 2025-03-30 11:39:44,566 - 🔄 Macronizing (oxytonized): διά (διά, ADP, )
-                # 2025-03-30 11:39:44,566 - 	✅ Custom: διά => δι^ά^, with 0 left
-                # 2025-03-30 11:39:44,566 - 	✅ Decapitalization helped: 0 left
-                # 2025-03-30 11:39:44,567 - 	✅ Oxytonizing helped: : 0 left
+            # if not reversed_elision_pass:
 
-            ### WRONG-CASE-ENDING RECURSION ### e.g. πόλιν should go through πόλις
+
+            ### WRONG-CASE-ENDING RECURSION ### 
+             
+            '''
+            e.g. πόλιν should go through πόλις
+            '''
 
             # 2nd declension
             ''' 
@@ -639,6 +659,9 @@ class Macronizer:
         return ratio
     
     def apply_accentuation_rules(self, old_version):
+        if "'" in old_version:
+            return old_version
+
         if not old_version:
             return old_version
         old_version = normalize_word(old_version)

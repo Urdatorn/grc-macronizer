@@ -33,7 +33,7 @@ def malformed(word):
         return False
     
 def word_list(text):
-    greek_punctuation = r'[\u0387\u037e\.,!?;:\"\'()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
+    greek_punctuation = r'[\u0387\u037e\.,!?;:\"()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
     
     cleaned_text = re.sub(greek_punctuation, ' ', text)
 
@@ -62,9 +62,9 @@ class Text:
         translation_table = str.maketrans("", "", "".join(to_remove))
 
         before_odycy = text
-        if debug: 
-            logging.debug(f"Text before odyCy: {before_odycy}")
         before_odycy = before_odycy.translate(translation_table)
+        if debug: 
+            logging.debug(f"Text before odyCy but after clean-up: {before_odycy}")
 
         diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
@@ -167,11 +167,12 @@ class Text:
             if self.debug:
                 logging.debug(f"Processing: {macronized_word} (Current count: {current_count})")
             
-            # Find all matches of the normalized word in the original text
-            matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
-            
-            if normalized_word == "Διὰ":
-                logging.debug(f"BUG Matches for '{normalized_word}': {[match.group() for match in matches]}")
+            '''
+            NOTE re the regex: \b does not work for strings containing apostrophe!
+            Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit \w to match word boundaries instead.
+            '''
+            matches = list(re.finditer(fr"(?<!\w){normalized_word}(?!\w)", self.text)) 
+            #matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
 
             if current_count >= len(matches):
                 raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")

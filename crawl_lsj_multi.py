@@ -1,11 +1,4 @@
-'''
-
-For all nouns, Bailly abrégé has (ὁ)&nbsp; (ἡ)&nbsp; or (τό)&nbsp;
-'''
-
-import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import pickle
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -18,6 +11,8 @@ import ast  # For safely parsing the existing dictionary from the file
 from format_macrons import macron_unicode_to_markup
 from grc_utils import macrons_map
 from greek_accentuation.characters import length
+
+from db.lsj_keys_first_70k import lsj_keys
 
 
 SHORT = '̆'
@@ -51,9 +46,6 @@ def has_macron_or_breve(word):
 # Function to process a single key and return its macronized word
 def process_key(key):
     return key, get_macronized_word(key)
-
-with open("db/lsj_keys.pkl", "rb") as f:
-    lsj_keys = pickle.load(f)  # 142058 keys
 
 # Load already processed words from the output file if it exists
 output_file = "db/crawl_lsj.py"
