@@ -242,6 +242,7 @@ class Macronizer:
                                   'παρα': 'πα^ρα^',
                                   'περι': 'περι^',
                                   'συν': 'συ^ν',
+                                  'ξυν': 'ξυ^ν',
                                   'συμ': 'συ^μ',
                                   'ὑπερ': 'ὑ^περ',
                                   'ὑπο': 'ὑ^πο',
@@ -511,7 +512,13 @@ class Macronizer:
 
         # STILL_AMBIGUOUS
 
-        still_ambiguous = set(still_ambiguous)
+        def sort_by_occurrences(lst):
+            count = Counter(lst)  # Count occurrences
+            sorted_lst = sorted(lst, key=lambda x: (-count[x], x))  # Sort by frequency (desc), then by value (asc)
+            return sorted_lst, count  # Return sorted list + count dictionary
+
+        sorted_list, counts = sort_by_occurrences(still_ambiguous)  # Preserve order
+        unique_sorted_list = list(dict.fromkeys(sorted_list))  # Remove duplicates while keeping order
 
         file_version = 1
         file_stub = ''
@@ -521,20 +528,19 @@ class Macronizer:
             if macronized_tokens[0]:
                 file_stub = f'diagnostics/still_ambiguous/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
             else:
-                file_stub = f'diagnostics/still_ambiguous/still_ambiguous'
+                file_stub = 'diagnostics/still_ambiguous/still_ambiguous'
 
             while True:
                 file_version = str(file_version)
                 file_name = file_stub + f'_{file_version}.py'
                 if not os.path.exists(file_name):
                     break
-                file_version = int(file_version)
-                file_version += 1
-        
+                file_version = int(file_version) + 1
+
             with open(file_name, 'w', encoding='utf-8') as f:
                 f.write('still_ambiguous = [\n')
-                for item in still_ambiguous:
-                    f.write(f'    {repr(item)},\n')
+                for item in unique_sorted_list:  # Use unique sorted list to maintain order
+                    f.write(f'    {repr(item)},  # {counts[item]} occurrences\n')
                 f.write(']\n')
 
         return text_object.macronized_text
