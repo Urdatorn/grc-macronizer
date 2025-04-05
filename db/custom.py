@@ -3,9 +3,13 @@ custom_macron_map = {
     # Crases
     "τοὔνομα": "τοὔνομα^",
 
-    # Articles and relative pronouns
+    # Articles
+
+    "ἁ": "ἁ_", # doric ἡ
     "τὰ": "τὰ^",
     "τὰς": "τὰ_ς",
+
+     # Pronouns (Personal, Demonstrative, Relative, Interrogative)
 
     "ἃ": "ἃ^",
 

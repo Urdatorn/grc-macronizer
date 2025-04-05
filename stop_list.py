@@ -6,6 +6,4 @@ Whether to use the stop list or not in a given production situation comes down t
 '''
 
 stop_list = [
-    'ἂν' # perhaps THE most notorious dichronon. To disambiguate it, we require knowing whether or not (1) the present clause contains εἰ already (2) the main verb is in the indicative or subjunctive mood.
-    'ἄν'
 ]

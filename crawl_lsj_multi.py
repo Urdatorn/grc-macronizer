@@ -1,29 +1,33 @@
+import ast
+from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+import random
 import requests
-from bs4 import BeautifulSoup
-from tqdm import tqdm
-import time
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-import ast  # For safely parsing the existing dictionary from the file
+from tqdm import tqdm
+import time
 
 from format_macrons import macron_unicode_to_markup
 from grc_utils import macrons_map
 from greek_accentuation.characters import length
-
-from db.lsj_keys_first_70k import lsj_keys
-
+from db.lsj_keys import lsj_keys
 
 SHORT = '̆'
 LONG = '̄'
 
-# Function to get the macronized word from the LSJ website
 def get_macronized_word(greek_word):
     url = f"https://lsj.gr/wiki/{greek_word}"
     session = requests.Session()
     retries = Retry(total=5, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
     session.mount("https://", HTTPAdapter(max_retries=retries))
+    
+    # Random wait time between 2 and 5 seconds (you can adjust these values)
+    wait_time = random.uniform(2, 5)
+    print(f"Waiting for {wait_time:.2f} seconds before making a request...")
+    time.sleep(wait_time)
+    
     try:
         response = session.get(url, timeout=10)
         if response.status_code == 200:
@@ -32,9 +36,13 @@ def get_macronized_word(greek_word):
             if span_elements:
                 word = span_elements[0].get_text()
                 return word
+            else:
+                # Return a dummy placeholder if the word is not found
+                return "NOT_FOUND"
     except requests.RequestException as e:
         print(f"Error fetching {greek_word}: {e}")
-    return None
+        # Return a dummy placeholder in case of an error
+        return "NOT_FOUND"
 
 def has_macron_or_breve(word):
     if word:

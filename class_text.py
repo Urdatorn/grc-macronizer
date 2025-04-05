@@ -8,10 +8,8 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 from stop_list import stop_list
 from stop_list_epic import epic_stop_words
-from tests.anabasis import anabasis
 from nominal_forms import macronize_nominal_forms
-from format_macrons import merge_or_overwrite_markup
-from grc_utils import base_alphabet, count_dichrona_in_open_syllables, lower_grc, upper_grc, normalize_word
+from grc_utils import base_alphabet, count_dichrona_in_open_syllables, normalize_word
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
@@ -63,6 +61,7 @@ class Text:
 
         before_odycy = text
         before_odycy = before_odycy.translate(translation_table)
+        before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
         if debug: 
             logging.debug(f"Text before odyCy but after clean-up: {before_odycy}")
 
@@ -97,27 +96,51 @@ class Text:
             doc_bin.to_disk(output_file_name)
 
         # Preparing the master list of words to be macronized (NOTE often THE key step in analyzing nonplussing bugs)
+        an_list = []
         fail_counter = 0
         token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
-        for doc in docs: # don't worry, pipe() returns docs in the right order
-            for token in doc:
-                logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
-                if token.orth_ and token.lemma_ and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs
-                    orth = token.orth_.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
-                    logging.debug(f"\t'Orth' token: {orth}")
+        for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs"): # don't worry, pipe() returns docs in the right order
+            for token in tqdm(doc, desc="First: macronizing all ἂν on the sentence level", leave=False):
+                logging.debug(f"Considering token: {token.text}\tOrth: {token.orth_}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
+                if token.text == 'ἂν' or token.text == 'ἄν':
+                    an = token.text
+                    subjunctive_verb = False
+                    no_ei = True
+                    logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token.text}")
+                    for inner_token in doc:  # Changed variable name to inner_token to avoid shadowing
+                        if inner_token.morph.get("Mood") == "Sub":
+                            subjunctive_verb = True
+                            logging.debug(f"\t\tSubjunctive verb found: {inner_token.text}")
+                        if inner_token.text == 'εἰ' or inner_token.text == 'εἴ':
+                            no_ei = False
+                            logging.debug(f"\t\tEi found: {inner_token.text}")  # Fixed typo in logging message
+                    if subjunctive_verb and no_ei:
+                        an_list.append(an + '_')
+                        logging.debug(f"\t\tLong ἂν macronized")
+                    else: 
+                        an_list.append(an + '^')
+                        logging.debug(f"\t\tShort ἂν macronized")
+
+                if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.
+                    orth = token.text.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
+                    logging.debug(f"\t'Token text: {orth}")
                     if orth in stop_list:
                         logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
                         continue
                     if genre == 'epic' and orth in epic_stop_words:
                         logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
                         continue
-                    if orth not in diagnostic_word_list:
+                    if orth not in diagnostic_word_list and orth != 'ἂν' and orth != 'ἄν':
                         fail_counter += 1
                         logging.debug(f"\033Word '{orth}' not in diagnostic word list. odyCy messed up here. Skipping with 'continue'.")
                         continue
+                    if token.text == 'ἂν' or token.text == 'ἄν':
+                        orth = an_list.pop(0)
+                        logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
+
                     # For speed, let's not bother even sending words without dichrona to the macronizer
-                    if count_dichrona_in_open_syllables(orth) == 0:
+                    if count_dichrona_in_open_syllables(orth) == 0 and orth not in ['ἂν_', 'ἂν^', 'ἄν_', 'ἄν^']:
                         logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
                         continue
                     # if not token.morph:
@@ -128,8 +151,9 @@ class Text:
                     logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                     macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
+        assert an_list == [], f"An list is not empty: {an_list}. This means that the ἂν macronization step failed. Please check the code."
         logging.debug(f'Len of token_lemma_pos_morph: {len(token_lemma_pos_morph)}')
-        logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[:10][0]}')
+        logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[0]}, {token_lemma_pos_morph[1]}...')
         logging.info(f'odyCy fail count: {fail_counter}')
 
         self.text = before_odycy # important: this is the cleaned text, without [, ], etc. If we try to integrate into the original text, we will get a lot of silent bugs or errors.
