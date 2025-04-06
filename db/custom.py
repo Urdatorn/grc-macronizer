@@ -11,7 +11,13 @@ custom_macron_map = {
 
      # Pronouns (Personal, Demonstrative, Relative, Interrogative)
 
-    "ἃ": "ἃ^",
+    # Relative pronouns
+
+    "ἃ": "ἃ^", # NOTE could be mixed up with doric!
+    "ἅς": "ἅ_ς",
+    "ἃς": "ἃ_ς",
+
+    # Interrogative pronouns
 
     "τί": "τί^",
 

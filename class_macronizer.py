@@ -141,10 +141,11 @@ class Macronizer:
         custom_results = []
         double_accent_recursion_results = []
         case_ending_recursion_results = []
+        reversed_elision_recursion_results = []
             
         def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False, reversed_elision_pass=False):
             '''
-            I aim to have quite a lot of symmetry here, so it should be possible to change the order of modules without having to rewrite too many lines. 
+            NOTE it is possible to change the order of modules without having to rewrite too many lines. 
             '''
             
             recursion_depth += 1
@@ -177,48 +178,63 @@ class Macronizer:
                 custom_results.append(macronized_token)
                 return macronized_token
 
+            old_macronized_token = macronized_token
             wiktionary_token = self.wiktionary(macronized_token, lemma, pos, morph)
-            if self.debug:
-                logging.debug(f'\t✅ Wiktionary: {token} => {wiktionary_token}, with {count_dichrona_in_open_syllables(wiktionary_token)} left')
             macronized_token = merge_or_overwrite_markup(wiktionary_token, macronized_token)
-
-            if count_dichrona_in_open_syllables(macronized_token) == 0:
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 wiktionary_results.append(macronized_token)
+                logging.debug(f'\t✅ Wiktionary: {token} => {wiktionary_token}, with {count_dichrona_in_open_syllables(wiktionary_token)} left')
+            else:
+                logging.debug(f'\t❌ Wiktionary did not help')
+            
+            if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
+            old_macronized_token = macronized_token
             hypotactic_token = self.hypotactic(macronized_token)
-            if self.debug:
-                logging.debug(f'\t✅ Hypotactic: {wiktionary_token} => {merge_or_overwrite_markup(hypotactic_token, wiktionary_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(hypotactic_token, wiktionary_token))} left')
             macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                hypotactic_results.append(macronized_token)
+                logging.debug(f'\t✅ Hypotactic helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Hypotactic did not help')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
-                hypotactic_results.append(macronized_token)
                 return macronized_token
             
+            old_macronized_token = macronized_token
             lsj_token = lsj.get(token, token)
             if normalize_word(lsj_token.replace('^', '').replace('_', '')) == normalize_word(token.replace('^', '').replace('_', '')): # There are some accent bugs in the lsj db. Better safe than sorry
-                if lsj_token == token:
-                    logging.debug(f'\t❌ LSJ did not help')
+                macronized_token = merge_or_overwrite_markup(lsj_token, macronized_token)
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    lsj_results.append(macronized_token)
+                    logging.debug(f'\t✅ LSJ helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
-                    logging.debug(f'\t✅ LSJ: {token} => {lsj_token}, with {count_dichrona_in_open_syllables(lsj_token)} left')
-                    macronized_token = merge_or_overwrite_markup(lsj_token, macronized_token)
+                    logging.debug(f'\t❌ LSJ did not help')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
-                lsj_results.append(macronized_token)
                 return macronized_token
 
+            old_macronized_token = macronized_token
             nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
-            if self.debug:
-                logging.debug(f'\t✅ Nominal forms: {macronized_token} => {merge_or_overwrite_markup(nominal_forms_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(nominal_forms_token, macronized_token))} left')
             macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
-
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                nominal_forms_results.append(macronized_token)
+                logging.debug(f'\t✅ Nominal forms helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Nominal forms did not help')
+            
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
+            old_macronized_token = macronized_token
             accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
-            if self.debug:
-                logging.debug(f'\t✅ Accent rules: {macronized_token} => {merge_or_overwrite_markup(accent_rules_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(accent_rules_token, macronized_token))} left')
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                accent_rules_results.append(macronized_token)
+                logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Accent rules did not help')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
@@ -366,10 +382,36 @@ class Macronizer:
             # TODO Recursively handle elided words like παρ'
             # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
             # In that case we could simply search for the lemma and then merge lemma[:-1].
+            # Elided final vowels: {"α^", "ε", "ι^"}. Though maybe alpha is rare?
             '''
 
-            # if not reversed_elision_pass:
+            elided_vowels = ["ε", "ι"]
+            reversed_worked = False
+            old_macronized_token = macronized_token
+            if not reversed_elision_pass and token[-1] == "'":
+                reversed_elision_token = token[:-1] + elided_vowels[0] # remove the apostrophe and add a vowel
+                reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
+                logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
+                restored_token = reversed_elision_token[:-1] + "'"
+                macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    reversed_worked = True
+                    reversed_elision_recursion_results.append(macronized_token)
+                    logging.debug(f'\t✅ Reversed elision with iota macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                else:
+                    logging.debug(f'\t❌ Reversed elision with epsilon macronization did not help')
 
+            if not reversed_worked and not reversed_elision_pass and token[-1] == "'":
+                reversed_elision_token = token[:-1] + elided_vowels[1] # remove the apostrophe and add a vowel
+                reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
+                logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
+                restored_token = reversed_elision_token[:-1] + "'"
+                macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    reversed_elision_recursion_results.append(macronized_token)
+                    logging.debug(f'\t✅ Reversed elision with iota macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                else:
+                    logging.debug(f'\t❌ Reversed elision with iota macronization did not help either')
 
             ### WRONG-CASE-ENDING RECURSION ### 
              
@@ -471,11 +513,20 @@ class Macronizer:
                     nominative_token = macronized_token[:-2] + lemma[-1]
             
             ### OXYTONIZING RECURSION ###
-            if not oxytonized_pass and macronized_token[-1] in GRAVES or macronized_token[-2] in GRAVES: # e.g. στρατηγὸν
+            if (
+                not oxytonized_pass and (
+                    macronized_token[-1] in GRAVES or
+                    (len(macronized_token) > 1 and macronized_token[-2] in GRAVES)
+                )
+            ): # e.g. στρατηγὸν
                 old_macronized_token = macronized_token
-                oxytonized_token = replace_grave_with_acute(old_macronized_token)
+                oxytonized_token = old_macronized_token[:-2] + replace_grave_with_acute(old_macronized_token[-2:])
                 oxytonized_token = macronization_modules(oxytonized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=True, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
-                rebarytonized_token = replace_acute_with_grave(oxytonized_token)
+                rebarytonized_token = ''
+                if len(oxytonized_token) > 2:
+                    rebarytonized_token = oxytonized_token[:-3] + replace_acute_with_grave(oxytonized_token[-3:])
+                else:
+                    rebarytonized_token = oxytonized_token[:-2] + replace_acute_with_grave(oxytonized_token[-2:])
                 macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                 if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -569,6 +620,7 @@ class Macronizer:
             "custom_results": custom_results,
             "double_accent_recursion_results": double_accent_recursion_results,
             "case_ending_recursion_results": case_ending_recursion_results,
+            "reversed_elision_recursion_results": reversed_elision_recursion_results,
         }
 
         for name, result_list in results_dict.items():

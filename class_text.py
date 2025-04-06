@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from stop_list import stop_list
 from stop_list_epic import epic_stop_words
 from nominal_forms import macronize_nominal_forms
-from grc_utils import base_alphabet, count_dichrona_in_open_syllables, normalize_word
+from grc_utils import ACUTES, base_alphabet, count_dichrona_in_open_syllables, GRAVES, normalize_word
 
 from spacy.tokens import DocBin
 import grc_odycy_joint_trf
@@ -56,7 +56,7 @@ class Text:
 
     def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
 
-        to_remove = {'^', '_', '<', '>', '[', ']', '«', '»', '†'}
+        to_remove = {'^', '_', '-', '<', '>', '[', ']', '«', '»', '†'} # 6/4 added dash because of buggy corpora with broken-up words
         translation_table = str.maketrans("", "", "".join(to_remove))
 
         before_odycy = text
@@ -98,23 +98,24 @@ class Text:
         # Preparing the master list of words to be macronized (NOTE often THE key step in analyzing nonplussing bugs)
         an_list = []
         fail_counter = 0
+        buggy_words_in_input = 0
         token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
         for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs"): # don't worry, pipe() returns docs in the right order
-            for token in tqdm(doc, desc="First: macronizing all ἂν on the sentence level", leave=False):
+            for token in doc:
                 logging.debug(f"Considering token: {token.text}\tOrth: {token.orth_}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                 if token.text == 'ἂν' or token.text == 'ἄν':
                     an = token.text
                     subjunctive_verb = False
                     no_ei = True
                     logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token.text}")
-                    for inner_token in doc:  # Changed variable name to inner_token to avoid shadowing
+                    for inner_token in doc:
                         if inner_token.morph.get("Mood") == "Sub":
                             subjunctive_verb = True
                             logging.debug(f"\t\tSubjunctive verb found: {inner_token.text}")
                         if inner_token.text == 'εἰ' or inner_token.text == 'εἴ':
                             no_ei = False
-                            logging.debug(f"\t\tEi found: {inner_token.text}")  # Fixed typo in logging message
+                            logging.debug(f"\t\tEi found: {inner_token.text}")
                     if subjunctive_verb and no_ei:
                         an_list.append(an + '_')
                         logging.debug(f"\t\tLong ἂν macronized")
@@ -125,6 +126,14 @@ class Text:
                 if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.
                     orth = token.text.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
                     logging.debug(f"\t'Token text: {orth}")
+                    if 'ς' in list(orth[:-1]):
+                        logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
+                        buggy_words_in_input += 1
+                        continue
+                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)):
+                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave. Skipping with 'continue'.")
+                        buggy_words_in_input += 1
+                        continue
                     if orth in stop_list:
                         logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
                         continue
@@ -193,7 +202,7 @@ class Text:
             
             '''
             NOTE re the regex: \b does not work for strings containing apostrophe!
-            Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit \w to match word boundaries instead.
+            Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit w to match word boundaries instead.
             '''
             matches = list(re.finditer(fr"(?<!\w){normalized_word}(?!\w)", self.text)) 
             #matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
