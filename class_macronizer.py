@@ -22,7 +22,10 @@ from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"diagnostics/logs/macronizer_{timestamp}.log"
+log_dir = "diagnostics/logs"
+log_filename = f"{log_dir}/macronizer_{timestamp}.log"
+
+os.makedirs(log_dir, exist_ok=True)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -647,13 +650,16 @@ class Macronizer:
             "reversed_elision_recursion_results": reversed_elision_recursion_results,
         }
 
+        module_dir = 'diagnostics/modules'
+        os.makedirs(module_dir, exist_ok=True)
+
         for name, result_list in results_dict.items():
             logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
-            with open(f'diagnostics/modules/{name}.txt', 'w', encoding='utf-8') as f:
+            with open(f'{module_dir}/{name}.txt', 'w', encoding='utf-8') as f:
                 for word in result_list:
                     f.write(f'{word}\n')
 
-        with open('diagnostics/modules/case_recursion.txt', 'w', encoding='utf-8') as f:
+        with open(f'{module_dir}/case_recursion.txt', 'w', encoding='utf-8') as f:
             for word in case_ending_recursion_results:
                 f.write(f'{word}\n')
 
@@ -671,11 +677,14 @@ class Macronizer:
         file_stub = ''
         file_name = ''
 
+        still_ambiguous_dir = 'diagnostics/still_ambiguous'
+        os.makedirs(still_ambiguous_dir, exist_ok=True)
+
         if len(macronized_tokens) > 0:
             if macronized_tokens[0]:
-                file_stub = f'diagnostics/still_ambiguous/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
+                file_stub = f'{still_ambiguous_dir}/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
             else:
-                file_stub = 'diagnostics/still_ambiguous/still_ambiguous'
+                file_stub = f'{still_ambiguous_dir}/still_ambiguous'
 
             while True:
                 file_version = str(file_version)
