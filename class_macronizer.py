@@ -609,7 +609,7 @@ class Macronizer:
             macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
             token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
             assert not macronized_diphthong(macronized_token), f"Watch out! We just macronized a diphthong: {macronized_token}"
-            assert macronized_normalized_for_checking == token_normalized_for_checking, f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace("^", "").replace("_", "")}"
+            assert macronized_normalized_for_checking == token_normalized_for_checking, f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace('^', '').replace('_', '')}"
 
             return macronized_token
 
