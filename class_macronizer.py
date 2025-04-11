@@ -21,7 +21,7 @@ from db.lsj import lsj
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
 
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # e.g., 20250329_120059
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 log_filename = f"diagnostics/logs/macronizer_{timestamp}.log"
 
 logging.basicConfig(
@@ -162,10 +162,25 @@ class Macronizer:
                 logging.debug(f'🔄 Macronizing (different-ending): {token} ({lemma}, {pos}, {morph})')
             elif is_lemma:
                 logging.debug(f'🔄 Macronizing (lemma): {token} ({lemma}, {pos}, {morph})')
+            elif reversed_elision_pass:
+                logging.debug(f'🔄 Macronizing (reversed elision): {token} ({lemma}, {pos}, {morph})')
             else:
                 logging.debug(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
 
             macronized_token = token
+
+            ### CUSTOM OVERRIDING ###
+
+            # Minimal pairs requiring special disambiguation
+
+            if token == 'ἄλλα':
+                if 'Fem' in morph.get("Gender"):
+                    logging.debug(f'\t✅ Macronized feminine {token}')
+                    return 'ἄλλα_'
+                else:
+                    logging.debug(f'\t✅ Macronized neutre {token}')
+                    return 'ἄλλα^' # neutre plural
+
 
             custom_token = custom_macronizer(macronized_token)
             if self.debug and custom_token != macronized_token:
@@ -177,6 +192,8 @@ class Macronizer:
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 custom_results.append(macronized_token)
                 return macronized_token
+
+            ### DB MODULES ####
 
             old_macronized_token = macronized_token
             wiktionary_token = self.wiktionary(macronized_token, lemma, pos, morph)
@@ -214,6 +231,8 @@ class Macronizer:
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
+
+            ### ALGORITHMIC MODULES ###
 
             old_macronized_token = macronized_token
             nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
@@ -379,13 +398,15 @@ class Macronizer:
             ### REVERSED-ELISION RECURSION ###
 
             '''
-            # TODO Recursively handle elided words like παρ'
-            # For many of these, odyCy has the lemma, e.g. παρά for παρ'.
-            # In that case we could simply search for the lemma and then merge lemma[:-1].
-            # Elided final vowels: {"α^", "ε", "ι^"}. Though maybe alpha is rare?
+            Handle elided words like παρ'
+            Elided final vowels: {"α^", "ε", "ι^"}. 
+                - Example of elided alpha: διωλόμεσθ' (Sophocles)
+            
+            NOTE: When sent to full recursion, a reversed non-existent token like *διωλόμεσθι will get macronized by the proparoxytone rule
+            and merged, introducing an error. Hence the extra check for ^ in the newly macronized token before re-elision.
             '''
 
-            elided_vowels = ["ε", "ι"]
+            elided_vowels = ["ε", "ι", "α"]
             reversed_worked = False
             old_macronized_token = macronized_token
             if not reversed_elision_pass and token[-1] == "'":
@@ -405,7 +426,10 @@ class Macronizer:
                 reversed_elision_token = token[:-1] + elided_vowels[1] # remove the apostrophe and add a vowel
                 reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
                 logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
-                restored_token = reversed_elision_token[:-1] + "'"
+                if reversed_elision_token[-1] == '^':
+                    restored_token = reversed_elision_token[:-2] + "'"
+                else:
+                    restored_token = reversed_elision_token[:-1] + "'"
                 macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
                 if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     reversed_elision_recursion_results.append(macronized_token)

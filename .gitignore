@@ -18,6 +18,8 @@
 format_anabasis.ipynb
 sandbox.ipynb
 test*
+crawl_bailly/
+db/Bailly2020-stardict/
 
 # diagnostics
 diagnostics/
@@ -30,3 +32,10 @@ odycy_docs/
 db/grc_macrons.db
 db/wiktionary_old.py
 db/grc_macrons.db
+db/lsj_old.py
+db/crawl_lsj_backup_34425.py
+db/crawl_lsj.py
+
+bailly*
+mullvad_codes.py
+crawl_lsj_multi.py

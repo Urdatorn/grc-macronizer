@@ -62,6 +62,7 @@ class Text:
         before_odycy = text
         before_odycy = before_odycy.translate(translation_table)
         before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
+        before_odycy = before_odycy.replace('τἄλλα', 'τἄλλα^')
         if debug: 
             logging.debug(f"Text before odyCy but after clean-up: {before_odycy}")
 
@@ -72,6 +73,11 @@ class Text:
             logging.debug(f'Split input into {len(sentence_list)} sentences.')
             for i, sentence in enumerate(sentence_list):
                 logging.debug(f"{i}: {sentence}")
+
+        # for sentence in sentence_list:
+        #     if 'τἄλλα' in sentence:
+        #         sentence = sentence.replace('τἄλλα', 'τἄλλα^')
+        #         logging.debug(f'Premacronizing τἄλλα instance!')
 
         # odyCy tokenization
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
