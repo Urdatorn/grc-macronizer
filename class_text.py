@@ -31,7 +31,7 @@ def malformed(word):
         return False
     
 def word_list(text):
-    greek_punctuation = r'[\u0387\u037e\.,!?;:\"()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
+    greek_punctuation = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
     
     cleaned_text = re.sub(greek_punctuation, ' ', text)
 
@@ -168,7 +168,10 @@ class Text:
 
         assert an_list == [], f"An list is not empty: {an_list}. This means that the ἂν macronization step failed. Please check the code."
         logging.debug(f'Len of token_lemma_pos_morph: {len(token_lemma_pos_morph)}')
-        logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[0]}, {token_lemma_pos_morph[1]}...')
+        if len(token_lemma_pos_morph) == 1:
+            logging.debug(f'Only element of token_lemma_pos_morph: {token_lemma_pos_morph[0]}')
+        if len(token_lemma_pos_morph) > 1:
+            logging.debug(f'First elements of token_lemma_pos_morph: {token_lemma_pos_morph[0]}, {token_lemma_pos_morph[1]}...')
         logging.info(f'odyCy fail count: {fail_counter}')
 
         self.text = before_odycy # important: this is the cleaned text, without [, ], etc. If we try to integrate into the original text, we will get a lot of silent bugs or errors.

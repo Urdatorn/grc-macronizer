@@ -10,3 +10,4 @@ grc_odycy_joint_trf==0.7.0
 # other
 lxml
 tqdm>=4.65.0
+xxhash

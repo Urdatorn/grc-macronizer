@@ -429,7 +429,7 @@ class Macronizer:
                 reversed_elision_token = token[:-1] + elided_vowels[1] # remove the apostrophe and add a vowel
                 reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
                 logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
-                if reversed_elision_token[-1] == '^':
+                if reversed_elision_token[-1] == '^' or reversed_elision_token[-1] == '_': # I have encountered pathological cases with long ultima
                     restored_token = reversed_elision_token[:-2] + "'"
                 else:
                     restored_token = reversed_elision_token[:-1] + "'"
