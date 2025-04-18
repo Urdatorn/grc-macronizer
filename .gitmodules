@@ -1,3 +1,6 @@
+# update pointers with:
+# 	git submodule update --recursive --remote --merge
+
 [submodule "grc-utils"]
 	path = grc-utils
 	url = https://github.com/Urdatorn/grc-utils.git
