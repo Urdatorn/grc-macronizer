@@ -107,7 +107,7 @@ class Text:
         buggy_words_in_input = 0
         token_lemma_pos_morph = []
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
-        for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs"): # don't worry, pipe() returns docs in the right order
+        for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
             for token in doc:
                 logging.debug(f"Considering token: {token.text}\tOrth: {token.orth_}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                 if token.text == 'ἂν' or token.text == 'ἄν':

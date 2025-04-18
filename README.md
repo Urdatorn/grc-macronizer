@@ -3,6 +3,7 @@
 A macronizer geared towards batch macronizing large corpora with machine-friendly markup, avoiding combining diacritics and everything that doesn't render in standard IDE and terminal fonts.
 
 *Preparation:*
+- Clone with `git clone --recurse-submodules` to get the submodules
 - Create a virtual environment with Python 3.12.
 - After having initialized your venv, install the right version of spaCy, the dependency of odyCy, with `pip install spacy>=3.7.4,<3.8.0`.
 - Use the submodule, or download odyCy by running `huggingface-cli download chcaa/grc_odycy_joint_trf`.

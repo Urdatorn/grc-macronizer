@@ -6,7 +6,7 @@ import pickle
 import re
 import sqlite3
 
-from tqdm import tqdm as tqdm
+from tqdm import tqdm
 
 from ascii import ascii_macronizer
 from barytone import replace_grave_with_acute, replace_acute_with_grave
@@ -75,10 +75,12 @@ def macronized_diphthong(word):
 class Macronizer:
     def __init__(self, 
                  macronize_everything=True,
+                 make_prints=True,
                  unicode=False,
                  debug=False):
 
         self.macronize_everything = macronize_everything
+        self.make_prints = make_prints
         self.unicode = unicode
         self.custom_db_file = 'db/custom.py'
         self.debug = debug
@@ -111,7 +113,7 @@ class Macronizer:
 
         return macronized
 
-    def macronize(self, text, genre='prose', stats=True):
+    def macronize(self, text, genre='prose'):
         """
         Macronization is a modular and recursive process comprised of the following operations, 
         where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
@@ -616,7 +618,7 @@ class Macronizer:
 
         macronized_tokens = []
         still_ambiguous = []
-        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=True):
+        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=self.make_prints):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
             if count_dichrona_in_open_syllables(result) > 0:
@@ -628,7 +630,7 @@ class Macronizer:
         text_object.macronized_words = macronized_tokens
         text_object.integrate() # creates the final .macronized_text
 
-        if stats:
+        if self.make_prints:
             self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
         
         # MODULE EFFICACY LISTS

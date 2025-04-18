@@ -3,7 +3,7 @@ import sys
 from class_macronizer import Macronizer
 from grc_utils import colour_dichrona_in_open_syllables
 
-macronizer = Macronizer(debug=False)
+macronizer = Macronizer(make_prints=True)
 
 input_file = sys.argv[1]
 output_file = sys.argv[2]
