@@ -1,7 +1,7 @@
 import pickle
 
-from db.lsj_keys import lsj_keys
+from db.hypotactic import hypotactic
 
-with open('db/lsj_keys.pkl', 'wb') as f:
-    pickle.dump(lsj_keys, f)
+with open('db/hypotactic.pkl', 'wb') as f:
+    pickle.dump(hypotactic, f)
 

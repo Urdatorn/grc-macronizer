@@ -21,6 +21,10 @@ from db.lsj import lsj
 from morph_disambiguator import morph_disambiguator
 from verbal_forms import macronize_verbal_forms
 
+# --- Preamble ---
+
+# Logging setup
+
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 log_dir = "diagnostics/logs"
 log_filename = f"{log_dir}/macronizer_{timestamp}.log"
@@ -37,17 +41,24 @@ logging.info("Starting new log...")
 for line in ascii_macronizer:
     logging.info(line)
 
-diphth_y = r'[αεηο][ὐὔυὑύὖῦὕὗὺὒὓ]'
-diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
-adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅἂἃἤἥἣἢἦἧἆἇὧὦ]ι'
-
-combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
+# Load pickled data
 
 with open("db/lsj_keys.pkl", "rb") as f:
     lsj_keys = pickle.load(f)
 
 # Convert lsj_keys to a set for faster lookups
 lsj_keys_set = {only_bases(key) for key in lsj_keys}
+
+with open("db/hypotactic.pkl", "rb") as f:
+    hypotactic = pickle.load(f)
+
+# Function to detect accidentally macronzied diphthongs
+
+diphth_y = r'[αεηο][ὐὔυὑύὖῦὕὗὺὒὓ]'
+diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
+adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅἂἃἤἥἣἢἦἧἆἇὧὦ]ι'
+
+combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
 
 def macronized_diphthong(word):
     '''
@@ -59,6 +70,8 @@ def macronized_diphthong(word):
     '''
     return bool(re.search(combined_pattern, word))
 
+# --- Main class ---
+
 class Macronizer:
     def __init__(self, 
                  macronize_everything=True,
@@ -67,23 +80,8 @@ class Macronizer:
 
         self.macronize_everything = macronize_everything
         self.unicode = unicode
-        self.hypotactic_db_file = 'db/hypotactic.db'
-        self.aristophanes_db_file = None
         self.custom_db_file = 'db/custom.py'
         self.debug = debug
-
-        self.hypotactic_map = {}
-        try:
-            conn = sqlite3.connect(self.hypotactic_db_file)
-            cursor = conn.cursor()
-            cursor.execute("SELECT token, macrons FROM annotated_tokens")
-            rows = cursor.fetchall()
-            conn.close()
-            
-            for token, macrons in rows:
-                self.hypotactic_map[token] = macrons
-        except sqlite3.Error as e:
-            logging.info(f"Warning: Could not load hypotactic database: {e}")
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -107,11 +105,11 @@ class Macronizer:
         >>> ἀ^γα^θῆς
         '''
         word = word.replace('^', '').replace('_', '')
+        word = normalize_word(word)
 
-        macrons = self.hypotactic_map.get(word)
-        if macrons:
-            return macron_integrate_markup(word, macrons)
-        return word
+        macronized = hypotactic.get(word)
+
+        return macronized
 
     def macronize(self, text, genre='prose', stats=True):
         """
