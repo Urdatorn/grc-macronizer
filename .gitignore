@@ -14,30 +14,25 @@
 # temp
 **temp/
 
+# build artifacts
+src/grc_macronizer.egg-info
+
 # behind-the-scenes stuff
-format_anabasis.ipynb
-sandbox.ipynb
-test*
-crawl_bailly/
-db/Bailly2020-stardict/
+#scripts/dev
+notebooks/sandbox.ipynb
+src/grc_macronizer/test*.py
+
 
 # diagnostics
-diagnostics/logs
-diagnostics/modules
-diagnostics/still_ambiguous
+src/grc_macronizer/diagnostics/logs
+src/grc_macronizer/diagnostics/modules
+src/grc_macronizer/diagnostics/still_ambiguous
 
 # odycy docs (keeping the anabasis doc so users can use the benchmark faster)
-odycy_docs/
-!odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
+src/grc_macronizer/odycy_docs/
+!src/grc_macronizer/odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
 
 # unused db
-db/grc_macrons.db
-db/wiktionary_old.py
-db/grc_macrons.db
-db/lsj_old.py
-db/crawl_lsj_backup_34425.py
-db/crawl_lsj.py
-
-bailly*
-mullvad_codes.py
-crawl_lsj_multi.py
+src/grc_macronizer/db/hypotactic.py
+src/grc_macronizer/db/wiktionary_old.py
+src/grc_macronizer/db/wiktionary_example.py

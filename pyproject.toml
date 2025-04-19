@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grc-macronizer"
+version = "0.1.0"
+description = "A macronizer for Ancient Greek"
+authors = [
+    { name = "Albin Ruben Johannes Thörn Cleland", email = "albin.thorn_cleland@klass.lu.se" }
+]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Text Processing :: Linguistic",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    # Submodule (local or installable) — adjust if it's local!
+    "grc_utils==0.1.0",
+
+    # odyCy
+    "spacy>=3.7.4,<3.8.0",
+    "grc_odycy_joint_trf==0.7.0",
+
+    # Other
+    "lxml",
+    "tqdm>=4.65.0",
+    "xxhash"
+]
+requires-python = "==3.12.*"
+
+[project.optional-dependencies]
+dev = []
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["grc_macronizer*"]

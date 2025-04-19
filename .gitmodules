@@ -2,14 +2,10 @@
 # 	git submodule update --recursive --remote --merge
 
 [submodule "grc-utils"]
-	path = grc-utils
+	path = external/grc-utils
 	url = https://github.com/Urdatorn/grc-utils.git
 	branch = master
-[submodule "greek_proper_names_cltk"]
-	path = greek_proper_names_cltk
-	url = https://github.com/Urdatorn/greek_proper_names_cltk.git
-	branch = master
 [submodule "grc_odycy_joint_trf"]
-	path = grc_odycy_joint_trf
+	path = external/grc_odycy_joint_trf
 	url = https://huggingface.co/chcaa/grc_odycy_joint_trf
 	branch = main
