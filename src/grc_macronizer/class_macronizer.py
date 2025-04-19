@@ -1,7 +1,9 @@
 from collections import Counter
 from datetime import datetime
+from importlib.resources import files
 import logging
 import os
+from pathlib import Path
 import pickle
 import re
 import sqlite3
@@ -27,8 +29,8 @@ from .verbal_forms import macronize_verbal_forms
 # Logging setup
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_dir = "src/grc_macronizer/diagnostics/logs"
-log_filename = f"{log_dir}/macronizer_{timestamp}.log"
+log_dir = Path("diagnostics") / "logs"  # relative to working directory!
+log_filename = log_dir / f"macronizer_{timestamp}.log"
 
 os.makedirs(log_dir, exist_ok=True)
 
@@ -44,13 +46,15 @@ for line in ascii_macronizer:
 
 # Load pickled data
 
-with open("src/grc_macronizer/db/lsj_keys.pkl", "rb") as f:
+lsj_keys_path = files("grc_macronzier.db").joinpath("lsj_keys.pkl")
+with lsj_keys_path.open("rb") as f:
     lsj_keys = pickle.load(f)
 
 # Convert lsj_keys to a set for faster lookups
 lsj_keys_set = {only_bases(key) for key in lsj_keys}
 
-with open("src/grc_macronizer/db/hypotactic.pkl", "rb") as f:
+hypotactic_path = files("grc_macronizer.db").joinpath("hypotactic.pkl")
+with hypotactic_path.open("rb") as f:
     hypotactic = pickle.load(f)
 
 # Function to detect accidentally macronzied diphthongs
@@ -83,7 +87,7 @@ class Macronizer:
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
         self.unicode = unicode
-        self.custom_db_file = 'src/grc_macronizer/db/custom.py'
+        self.custom_db_file = files("grc_macronizer.db").joinpath("custom.py")
         self.debug = debug
             
     def wiktionary(self, word, lemma, pos, morph):
@@ -651,18 +655,15 @@ class Macronizer:
             "reversed_elision_recursion_results": reversed_elision_recursion_results,
         }
 
-        module_dir = 'src/grc_macronizer/diagnostics/modules'
-        os.makedirs(module_dir, exist_ok=True)
+        module_dir = Path("diagnostics") / "modules"
+        module_dir.mkdir(parents=True, exist_ok=True)  # better than os.makedirs
 
         for name, result_list in results_dict.items():
             logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
-            with open(f'{module_dir}/{name}.txt', 'w', encoding='utf-8') as f:
+            out_path = module_dir / f"{name}.txt"
+            with out_path.open("w", encoding="utf-8") as f:
                 for word in result_list:
-                    f.write(f'{word}\n')
-
-        with open(f'{module_dir}/case_recursion.txt', 'w', encoding='utf-8') as f:
-            for word in case_ending_recursion_results:
-                f.write(f'{word}\n')
+                    f.write(f"{word}\n")
 
         # STILL_AMBIGUOUS
 
@@ -671,6 +672,7 @@ class Macronizer:
             sorted_lst = sorted(lst, key=lambda x: (-count[x], x))  # Sort by frequency (desc), then by value (asc)
             return sorted_lst, count  # Return sorted list + count dictionary
 
+        # Assuming still_ambiguous is a list of some kind
         sorted_list, counts = sort_by_occurrences(still_ambiguous)  # Preserve order
         unique_sorted_list = list(dict.fromkeys(sorted_list))  # Remove duplicates while keeping order
 
@@ -678,23 +680,22 @@ class Macronizer:
         file_stub = ''
         file_name = ''
 
-        still_ambiguous_dir = 'src/grc_macronizer/diagnostics/still_ambiguous'
-        os.makedirs(still_ambiguous_dir, exist_ok=True)
+        still_ambiguous_dir = Path("diagnostics") / "still_ambiguous"
+        still_ambiguous_dir.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
 
         if len(macronized_tokens) > 0:
             if macronized_tokens[0]:
-                file_stub = f'{still_ambiguous_dir}/still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
+                file_stub = still_ambiguous_dir / f'still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
             else:
-                file_stub = f'{still_ambiguous_dir}/still_ambiguous'
+                file_stub = still_ambiguous_dir / 'still_ambiguous'
 
             while True:
-                file_version = str(file_version)
-                file_name = file_stub + f'_{file_version}.py'
-                if not os.path.exists(file_name):
+                file_name = file_stub.with_name(f'{file_stub.stem}_{file_version}.py')  # Handle file naming with versioning
+                if not file_name.exists():  # Check if the file exists using Path's .exists()
                     break
-                file_version = int(file_version) + 1
+                file_version += 1
 
-            with open(file_name, 'w', encoding='utf-8') as f:
+            with file_name.open('w', encoding='utf-8') as f:  # Use Path's .open() method
                 f.write('still_ambiguous = [\n')
                 for item in unique_sorted_list:  # Use unique sorted list to maintain order
                     f.write(f'    {repr(item)},  # {counts[item]} occurrences\n')

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grc-macronizer"
-version = "0.1.0"
+version = "1.0.0"
 description = "A macronizer for Ancient Greek"
 authors = [
     { name = "Albin Ruben Johannes Thörn Cleland", email = "albin.thorn_cleland@klass.lu.se" }
@@ -31,6 +31,12 @@ dependencies = [
     "xxhash"
 ]
 requires-python = "==3.12.*"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+
+[project.urls]
+Homepage = "https://github.com/Urdatorn/grc_macronizer"
 
 [project.optional-dependencies]
 dev = []
@@ -41,3 +47,6 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["grc_macronizer*"]
+
+[tool.setuptools.package-data]
+grc_macronizer = ["db/*.pkl"]

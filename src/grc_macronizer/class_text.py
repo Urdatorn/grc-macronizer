@@ -1,3 +1,4 @@
+from importlib import resources
 import logging
 import os
 import re
@@ -87,9 +88,9 @@ class Text:
         if debug:
             logging.debug(f"Hash value: {hash_value}")
         if len(sentence_list[0].split()) > 1: # ensure there are at least two words in the first sentence
-            output_file_name = f"src/grc_macronizer/odycy_docs/{"-".join(sentence_list[0].split()[i] for i in (0, 1)) + '-' + hash_value}.spacy"
+            output_file_name = f"{importlib.resources.path('grc_macronizer', 'odycy_docs')}/{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
         else:
-            output_file_name = f"src/grc_macronizer/odycy_docs/{sentence_list[0].split()[0] + '-' + hash_value}.spacy"
+            output_file_name = f"{importlib.resources.path('grc_macronizer', 'odycy_docs')}/{sentence_list[0].split()[0] + '-' + hash_value}.spacy"
         docs = []
         if doc_from_file and os.path.exists(output_file_name):
             doc_bin = DocBin().from_disk(output_file_name)
