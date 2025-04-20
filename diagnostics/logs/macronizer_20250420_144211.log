@@ -1,0 +1,36 @@
+2025-04-20 14:42:11,194 - Starting new log...
+2025-04-20 14:42:11,194 - #                                      _              
+2025-04-20 14:42:11,194 - # _ __ ___   __ _  ___ _ __ ___  _ __ (_)_______ _ __ 
+2025-04-20 14:42:11,194 - #| '_ ` _ \ / _` |/ __| '__/ _ \| '_ \| |_  / _ \ '__|
+2025-04-20 14:42:11,194 - #| | | | | | (_| | (__| | | (_) | | | | |/ /  __/ |   
+2025-04-20 14:42:11,194 - #|_| |_| |_|\__,_|\___|_|  \___/|_| |_|_/___\___|_|   
+2025-04-20 14:42:11,194 - #                                                     
+2025-04-20 14:42:11,194 - #                                                     
+2025-04-20 14:42:11,837 - Diagnostic word list: ['ἀνήρ']
+2025-04-20 14:42:17,879 - Considering token: ἀνήρ	Orth: ἀνήρ	Lemma: ἀνήρ	POS: NOUN	Morph: Case=Nom|Gender=Masc|Number=Sing
+2025-04-20 14:42:17,879 - 	'Token text: ἀνήρ
+2025-04-20 14:42:17,882 - 	Appended: 	Token: ἀνήρ	Lemma: ἀνήρ	POS: NOUN	Morph: Case=Nom|Gender=Masc|Number=Sing
+2025-04-20 14:42:17,882 - Len of token_lemma_pos_morph: 1
+2025-04-20 14:42:17,883 - Only element of token_lemma_pos_morph: ['ἀνήρ', 'ἀνήρ', 'NOUN', Case=Nom|Gender=Masc|Number=Sing]
+2025-04-20 14:42:17,883 - odyCy fail count: 0
+2025-04-20 14:42:17,883 - Sending to macronization_modules: ἀνήρ (ἀνήρ, NOUN, Case=Nom|Gender=Masc|Number=Sing)
+2025-04-20 14:42:17,883 - 🔄 Macronizing: ἀνήρ (ἀνήρ, NOUN, Case=Nom|Gender=Masc|Number=Sing)
+2025-04-20 14:42:17,883 - 	❌ Wiktionary did not help
+2025-04-20 14:42:17,883 - 	✅ Hypotactic helped: ἀνήρ => ἀ^νήρ, with 0 left
+2025-04-20 14:42:17,883 - 
+
+### END OF MACRONIZATION ###
+
+
+2025-04-20 14:42:17,884 - RESULT LIST: Found 0 results in wiktionary_results
+2025-04-20 14:42:17,884 - RESULT LIST: Found 1 results in hypotactic_results
+2025-04-20 14:42:17,884 - RESULT LIST: Found 0 results in lsj_results
+2025-04-20 14:42:17,884 - RESULT LIST: Found 0 results in nominal_forms_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in verbal_forms_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in accent_rules_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in prefix_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in lemma_generalization_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in custom_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in double_accent_recursion_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in case_ending_recursion_results
+2025-04-20 14:42:17,885 - RESULT LIST: Found 0 results in reversed_elision_recursion_results

@@ -1,9 +1,15 @@
+'''
+The Macronizer is very CPU intensive. On a system with multiple cores, ProcessPoolExecutor can speed up the process.
+Assuming a quadcore system as per default, I divide the input text into four parts and set max_workers=4.
+The Macronizer is faster if left to do its own sentence splitting, whence I will feed it four maximally long batches of texts.
+
+'''
+
 import sys
 
 from grc_macronizer import Macronizer
-from grc_utils import colour_dichrona_in_open_syllables
 
-macronizer = Macronizer(make_prints=True)
+macronizer = Macronizer(make_prints=False)
 
 input_file = sys.argv[1]
 output_file = sys.argv[2]

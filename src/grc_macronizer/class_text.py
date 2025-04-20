@@ -1,4 +1,4 @@
-import importlib
+from importlib.resources import path as resource_path  # rename to avoid confusion with the built-in path
 import logging
 import os
 import re
@@ -17,22 +17,6 @@ from .nominal_forms import macronize_nominal_forms
 
 
 warnings.filterwarnings('ignore', category=FutureWarning)
-
-def malformed(word):
-    '''
-    Filters out words without any diacritics.
-    Aimed to catch words mutilated by odyCy, such as "τοὔ" and "νομα" from "τοὔνομα".
-    The only proper such words are enclitics starting with consonants, such as φημι,
-    which are extraordinarily few and can be collected in a stoplist. 
-    '''
-    stoplist = { # TODO
-        "φημι",
-    }
-
-    if (char in base_alphabet for char in word) and word not in stoplist:
-        return True
-    else:
-        return False
     
 def word_list(text):
     greek_punctuation = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
@@ -59,6 +43,8 @@ class Text:
     '''
 
     def __init__(self, text, genre='prose', doc_from_file=True, debug=False, split_sentences_at='.'):
+        
+        # -- Prepare the text for odyCy --
 
         to_remove = {'^', '_', '-', '<', '>', '[', ']', '«', '»', '†'} # 6/4 added dash because of buggy corpora with broken-up words
         translation_table = str.maketrans("", "", "".join(to_remove))
@@ -78,34 +64,36 @@ class Text:
             for i, sentence in enumerate(sentence_list):
                 logging.debug(f"{i}: {sentence}")
 
-        # for sentence in sentence_list:
-        #     if 'τἄλλα' in sentence:
-        #         sentence = sentence.replace('τἄλλα', 'τἄλλα^')
-        #         logging.debug(f'Premacronizing τἄλλα instance!')
+        # -- odyCy tokenization and docbin saving --
 
-        # odyCy tokenization
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             logging.debug(f"Hash value: {hash_value}")
-        if len(sentence_list[0].split()) > 1: # ensure there are at least two words in the first sentence
-            output_file_name = f"{importlib.resources.path('grc_macronizer', 'odycy_docs')}/{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
-        else:
-            output_file_name = f"{importlib.resources.path('grc_macronizer', 'odycy_docs')}/{sentence_list[0].split()[0] + '-' + hash_value}.spacy"
-        docs = []
-        if doc_from_file and os.path.exists(output_file_name):
-            doc_bin = DocBin().from_disk(output_file_name)
-            nlp = grc_odycy_joint_trf.load()
-            docs = list(doc_bin.get_docs(nlp.vocab))
-        else:
-            nlp = grc_odycy_joint_trf.load()
-            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
-            doc_bin = DocBin()
-            for doc in docs:
-                doc_bin.add(doc)
-            logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
-            doc_bin.to_disk(output_file_name)
 
-        # Preparing the master list of words to be macronized (NOTE often THE key step in analyzing nonplussing bugs)
+        with resource_path("grc_macronizer", "odycy_docs") as odycy_docs_dir:
+            if len(sentence_list[0].split()) > 1:
+                filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
+            else:
+                filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
+
+            output_file_name = odycy_docs_dir / filename
+
+            docs = []
+            if doc_from_file and os.path.exists(output_file_name):
+                doc_bin = DocBin().from_disk(output_file_name)
+                nlp = grc_odycy_joint_trf.load()
+                docs = list(doc_bin.get_docs(nlp.vocab))
+            else:
+                nlp = grc_odycy_joint_trf.load()
+                docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
+                doc_bin = DocBin()
+                for doc in docs:
+                    doc_bin.add(doc)
+                logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
+                doc_bin.to_disk(output_file_name)
+
+        # -- Preparing the master list of words to be macronized (and handling ἄν) -- (NOTE often THE key step in analyzing nonplussing bugs)
+
         an_list = []
         fail_counter = 0
         buggy_words_in_input = 0

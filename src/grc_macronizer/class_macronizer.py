@@ -45,7 +45,7 @@ for line in ascii_macronizer:
 
 # Load pickled data
 
-lsj_keys_path = files("grc_macronzier.db").joinpath("lsj_keys.pkl")
+lsj_keys_path = files("grc_macronizer.db").joinpath("lsj_keys.pkl")
 with lsj_keys_path.open("rb") as f:
     lsj_keys = pickle.load(f)
 
