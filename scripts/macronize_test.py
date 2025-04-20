@@ -9,5 +9,5 @@ input = "ἀνήρ"
 output = macronizer.macronize(input)
 
 output_split = re.split(r'[.\n]', output)
-for line in output.split('.')[:10]:
+for line in output_split[:10]:
     print(colour_dichrona_in_open_syllables(line))

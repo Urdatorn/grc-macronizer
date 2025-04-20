@@ -18,12 +18,13 @@
 src/grc_macronizer.egg-info
 
 # behind-the-scenes stuff
-#scripts/dev
+scripts/dev
+scripts/test*
 notebooks/sandbox.ipynb
 src/grc_macronizer/test*.py
 
 # diagnostics
-diagnostics/*
+diagnostics/**/*
 
 # odycy docs (keeping the anabasis doc so users can use the benchmark faster)
 odycy_docs/
