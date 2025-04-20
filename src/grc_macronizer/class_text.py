@@ -8,7 +8,7 @@ import grc_odycy_joint_trf
 from spacy.tokens import DocBin
 import xxhash
 
-from grc_utils import ACUTES, base_alphabet, count_dichrona_in_open_syllables, GRAVES, normalize_word
+from grc_utils import ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word
 
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
