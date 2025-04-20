@@ -22,15 +22,12 @@ src/grc_macronizer.egg-info
 notebooks/sandbox.ipynb
 src/grc_macronizer/test*.py
 
-
 # diagnostics
-src/grc_macronizer/diagnostics/logs
-src/grc_macronizer/diagnostics/modules
-src/grc_macronizer/diagnostics/still_ambiguous
+diagnostics/*
 
 # odycy docs (keeping the anabasis doc so users can use the benchmark faster)
-src/grc_macronizer/odycy_docs/
-!src/grc_macronizer/odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
+odycy_docs/
+!odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
 
 # unused db
 src/grc_macronizer/db/hypotactic.py

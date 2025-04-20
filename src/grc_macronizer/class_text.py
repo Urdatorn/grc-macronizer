@@ -1,6 +1,5 @@
-from importlib.resources import path as resource_path  # rename to avoid confusion with the built-in path
 import logging
-import os
+from pathlib import Path
 import re
 from tqdm import tqdm
 import warnings
@@ -69,28 +68,31 @@ class Text:
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             logging.debug(f"Hash value: {hash_value}")
+        
+        project_root = Path(__file__).resolve().parents[2] # NOTE to self: pathlib for writing outside the src directory, importlib for reading inside (e.g. checking a pickled db)
+        odycy_docs_dir = project_root / "odycy_docs"
+        odycy_docs_dir.mkdir(parents=True, exist_ok=True)
 
-        with resource_path("grc_macronizer", "odycy_docs") as odycy_docs_dir:
-            if len(sentence_list[0].split()) > 1:
-                filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
-            else:
-                filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
+        if len(sentence_list[0].split()) > 1:
+            filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
+        else:
+            filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
 
-            output_file_name = odycy_docs_dir / filename
+        output_file_name = odycy_docs_dir / filename
 
-            docs = []
-            if doc_from_file and os.path.exists(output_file_name):
-                doc_bin = DocBin().from_disk(output_file_name)
-                nlp = grc_odycy_joint_trf.load()
-                docs = list(doc_bin.get_docs(nlp.vocab))
-            else:
-                nlp = grc_odycy_joint_trf.load()
-                docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
-                doc_bin = DocBin()
-                for doc in docs:
-                    doc_bin.add(doc)
-                logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
-                doc_bin.to_disk(output_file_name)
+        docs = []
+        if doc_from_file and output_file_name.exists():  # pathlib-style check
+            doc_bin = DocBin().from_disk(output_file_name)
+            nlp = grc_odycy_joint_trf.load()
+            docs = list(doc_bin.get_docs(nlp.vocab))
+        else:
+            nlp = grc_odycy_joint_trf.load()
+            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
+            doc_bin = DocBin()
+            for doc in docs:
+                doc_bin.add(doc)
+            logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
+            doc_bin.to_disk(output_file_name)
 
         # -- Preparing the master list of words to be macronized (and handling ἄν) -- (NOTE often THE key step in analyzing nonplussing bugs)
 

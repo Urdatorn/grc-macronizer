@@ -1,7 +1,6 @@
 import re
 
 from grc_macronizer import Macronizer
-#from grc_macronizer.tests.hiketides import hiketides
 from grc_utils import colour_dichrona_in_open_syllables
 
 macronizer = Macronizer(make_prints=False)
