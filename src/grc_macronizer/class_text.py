@@ -1,4 +1,4 @@
-from importlib import resources
+import importlib
 import logging
 import os
 import re
@@ -58,7 +58,7 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
+    def __init__(self, text, genre='prose', doc_from_file=True, debug=False, split_sentences_at='.'):
 
         to_remove = {'^', '_', '-', '<', '>', '[', ']', '«', '»', '†'} # 6/4 added dash because of buggy corpora with broken-up words
         translation_table = str.maketrans("", "", "".join(to_remove))
@@ -72,7 +72,7 @@ class Text:
 
         diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
-        sentence_list = [sentence for sentence in re.findall(r'[^.]+\.?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
+        sentence_list = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
             logging.debug(f'Split input into {len(sentence_list)} sentences.')
             for i, sentence in enumerate(sentence_list):

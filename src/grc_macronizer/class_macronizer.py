@@ -6,11 +6,10 @@ import os
 from pathlib import Path
 import pickle
 import re
-import sqlite3
 
 from tqdm import tqdm
 
-from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, DICHRONA, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
+from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 
 from .ascii import ascii_macronizer
 from .barytone import replace_grave_with_acute, replace_acute_with_grave
@@ -18,7 +17,7 @@ from .class_text import Text
 from .db.custom import custom_macronizer
 from .db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from .db.wiktionary_singletons import wiktionary_singletons_map
-from .format_macrons import macron_integrate_markup, macron_markup_to_unicode, macron_unicode_to_markup, merge_or_overwrite_markup
+from .format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
 from .db.proper_names import proper_names
 from .db.lsj import lsj
 from .morph_disambiguator import morph_disambiguator
@@ -57,7 +56,7 @@ hypotactic_path = files("grc_macronizer.db").joinpath("hypotactic.pkl")
 with hypotactic_path.open("rb") as f:
     hypotactic = pickle.load(f)
 
-# Function to detect accidentally macronzied diphthongs
+# Function to detect accidentally macronized diphthongs
 
 diphth_y = r'[αεηο][ὐὔυὑύὖῦὕὗὺὒὓ]'
 diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
