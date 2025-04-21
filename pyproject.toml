@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grc-macronizer"
-version = "1.1.0"
+version = "1.2.0"
 description = "A macronizer for Ancient Greek"
 authors = [
     { name = "Albin Ruben Johannes Thörn Cleland", email = "albin.thorn_cleland@klass.lu.se" }

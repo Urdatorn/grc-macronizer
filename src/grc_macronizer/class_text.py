@@ -1,4 +1,5 @@
 import logging
+from multiprocessing import Pool
 from pathlib import Path
 import re
 from tqdm import tqdm
@@ -14,7 +15,6 @@ from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
 from .nominal_forms import macronize_nominal_forms
 
-
 warnings.filterwarnings('ignore', category=FutureWarning)
     
 def word_list(text):
@@ -27,6 +27,11 @@ def word_list(text):
     logging.debug(f"Diagnostic word list: {word_list}")
 
     return word_list
+
+def process_batch(batch):
+    import grc_odycy_joint_trf  # Import inside to avoid top-level circularity
+    nlp = grc_odycy_joint_trf.load()  # Each process loads its own model
+    return list(nlp.pipe(batch, batch_size=32, n_process=1))  # Use single process per batch
 
 class Text:
     '''
@@ -41,7 +46,7 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, debug=False, split_sentences_at='.'):
+    def __init__(self, text, genre='prose', doc_from_file=True, debug=False, cores=1):
         
         # -- Prepare the text for odyCy --
 
@@ -68,26 +73,38 @@ class Text:
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             logging.debug(f"Hash value: {hash_value}")
-        
-        project_root = Path(__file__).resolve().parents[2] # NOTE to self: pathlib for writing outside the src directory, importlib for reading inside (e.g. checking a pickled db)
+        project_root = Path(__file__).resolve().parents[2]
         odycy_docs_dir = project_root / "odycy_docs"
         odycy_docs_dir.mkdir(parents=True, exist_ok=True)
-
         if len(sentence_list[0].split()) > 1:
             filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
         else:
             filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
-
         output_file_name = odycy_docs_dir / filename
-
         docs = []
-        if doc_from_file and output_file_name.exists():  # pathlib-style check
+        if doc_from_file and output_file_name.exists():
             doc_bin = DocBin().from_disk(output_file_name)
+            import grc_odycy_joint_trf  # Import here if needed
             nlp = grc_odycy_joint_trf.load()
             docs = list(doc_bin.get_docs(nlp.vocab))
         else:
-            nlp = grc_odycy_joint_trf.load()
-            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
+            batch_size = 1000  # Adjust based on memory
+            docs = []
+
+            # Split sentence_list into batches
+            batches = [sentence_list[i:i + batch_size] for i in range(0, len(sentence_list), batch_size)]
+
+            # Use multiprocessing.Pool to process batches in parallel
+            with Pool(processes=cores) as pool:
+                results = list(tqdm(
+                    pool.imap(process_batch, batches),
+                    total=len(batches),
+                    desc="Processing batches with odyCy"
+                ))
+            # Flatten the list of batch results
+            docs = [doc for batch_docs in results for doc in batch_docs]
+
+            # Save to DocBin
             doc_bin = DocBin()
             for doc in docs:
                 doc_bin.add(doc)
@@ -117,10 +134,10 @@ class Text:
                             no_ei = False
                             logging.debug(f"\t\tEi found: {inner_token.text}")
                     if subjunctive_verb and no_ei:
-                        an_list.append(an + '_')
+                        an_list.append(an[0] + '_' + an[1])
                         logging.debug(f"\t\tLong ἂν macronized")
                     else: 
-                        an_list.append(an + '^')
+                        an_list.append(an[0] + '^' + an[1])
                         logging.debug(f"\t\tShort ἂν macronized")
 
                 if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.

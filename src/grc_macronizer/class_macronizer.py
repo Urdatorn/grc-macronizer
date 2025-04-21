@@ -81,13 +81,16 @@ class Macronizer:
                  macronize_everything=True,
                  make_prints=True,
                  unicode=False,
-                 debug=False):
+                 debug=False,
+                 cores=1,
+                 doc_from_file=True):
 
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
         self.unicode = unicode
-        self.custom_db_file = files("grc_macronizer.db").joinpath("custom.py")
         self.debug = debug
+        self.cores = cores
+        self.doc_from_file = doc_from_file
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -117,7 +120,7 @@ class Macronizer:
 
         return macronized
 
-    def macronize(self, text, genre='prose'):
+    def macronize(self, text, genre='prose', cores=1):
         """
         Macronization is a modular and recursive process comprised of the following operations, 
         where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
@@ -132,8 +135,9 @@ class Macronizer:
         Accent rules and (naturally) lemma-based generalization are the only modules that rely on the output of the other modules for optimal performance.
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
+        cores = self.cores
 
-        text_object = Text(text, genre, doc_from_file=True, debug=self.debug)
+        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, cores=cores)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of module efficacy
