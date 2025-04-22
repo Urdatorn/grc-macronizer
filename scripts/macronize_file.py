@@ -1,7 +1,6 @@
 import sys
 
 from grc_macronizer import Macronizer
-from grc_utils import colour_dichrona_in_open_syllables
 
 macronizer = Macronizer(make_prints=True)
 
@@ -18,4 +17,5 @@ output = macronizer.macronize(text, genre="prose", stats=True)
 
 with open(output_file, 'w', encoding='utf-8') as f:
     f.write(output)
+    
 print(f"Macronized text written to '{output_file}'.")

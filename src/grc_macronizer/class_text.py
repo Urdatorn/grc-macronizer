@@ -1,5 +1,4 @@
 import logging
-from multiprocessing import Pool
 from pathlib import Path
 import re
 from tqdm import tqdm
@@ -46,7 +45,7 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, debug=False, cores=1):
+    def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
         
         # -- Prepare the text for odyCy --
 
@@ -73,38 +72,26 @@ class Text:
         hash_value = xxhash.xxh3_64_hexdigest(before_odycy)
         if debug:
             logging.debug(f"Hash value: {hash_value}")
-        project_root = Path(__file__).resolve().parents[2]
+        
+        project_root = Path(__file__).resolve().parents[2] # NOTE to self: pathlib for writing outside the src directory, importlib for reading inside (e.g. checking a pickled db)
         odycy_docs_dir = project_root / "odycy_docs"
         odycy_docs_dir.mkdir(parents=True, exist_ok=True)
+
         if len(sentence_list[0].split()) > 1:
             filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
         else:
             filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
+
         output_file_name = odycy_docs_dir / filename
+
         docs = []
-        if doc_from_file and output_file_name.exists():
+        if doc_from_file and output_file_name.exists():  # pathlib-style check
             doc_bin = DocBin().from_disk(output_file_name)
-            import grc_odycy_joint_trf  # Import here if needed
             nlp = grc_odycy_joint_trf.load()
             docs = list(doc_bin.get_docs(nlp.vocab))
         else:
-            batch_size = 1000  # Adjust based on memory
-            docs = []
-
-            # Split sentence_list into batches
-            batches = [sentence_list[i:i + batch_size] for i in range(0, len(sentence_list), batch_size)]
-
-            # Use multiprocessing.Pool to process batches in parallel
-            with Pool(processes=cores) as pool:
-                results = list(tqdm(
-                    pool.imap(process_batch, batches),
-                    total=len(batches),
-                    desc="Processing batches with odyCy"
-                ))
-            # Flatten the list of batch results
-            docs = [doc for batch_docs in results for doc in batch_docs]
-
-            # Save to DocBin
+            nlp = grc_odycy_joint_trf.load()
+            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
             doc_bin = DocBin()
             for doc in docs:
                 doc_bin.add(doc)
