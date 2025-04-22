@@ -27,11 +27,6 @@ def word_list(text):
 
     return word_list
 
-def process_batch(batch):
-    import grc_odycy_joint_trf  # Import inside to avoid top-level circularity
-    nlp = grc_odycy_joint_trf.load()  # Each process loads its own model
-    return list(nlp.pipe(batch, batch_size=32, n_process=1))  # Use single process per batch
-
 class Text:
     '''
     Container for text and metadata during macronization.
