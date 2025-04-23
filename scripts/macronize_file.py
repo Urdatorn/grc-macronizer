@@ -13,9 +13,9 @@ try:
 except FileNotFoundError:
     print(f"File '{input}' not found.")
 
-output = macronizer.macronize(text, genre="prose", stats=True)
+output = macronizer.macronize(text)
 
 with open(output_file, 'w', encoding='utf-8') as f:
     f.write(output)
-    
+
 print(f"Macronized text written to '{output_file}'.")

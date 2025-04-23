@@ -50,7 +50,12 @@ class Text:
         before_odycy = text
         before_odycy = before_odycy.translate(translation_table)
         before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
+        
+        ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
         before_odycy = before_odycy.replace('τἄλλα', 'τἄλλα^')
+        before_odycy = before_odycy.replace('ἁ', 'ἁ_')
+        ###
+
         if debug: 
             logging.debug(f"Text before odyCy but after clean-up: {before_odycy}")
 

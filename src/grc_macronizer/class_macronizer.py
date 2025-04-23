@@ -64,7 +64,7 @@ adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅ�
 
 combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
 
-def macronized_diphthong(word):
+def macronized_diphthong(word: str) -> bool:
     '''
     Part of the sanity check. 
     >>> macronized_diphthong("χίλι^οι)
@@ -72,7 +72,12 @@ def macronized_diphthong(word):
     >>> macronized_diphthong("χίλιοι^")
     True
     '''
-    return bool(re.search(combined_pattern, word))
+    syllable_list = syllabifier(word)
+
+    for syllable in syllable_list:
+        if bool(re.search(combined_pattern, syllable)):
+            return True
+    return False
 
 # --- Main class ---
 
