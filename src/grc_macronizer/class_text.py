@@ -8,7 +8,7 @@ import grc_odycy_joint_trf
 from spacy.tokens import DocBin
 import xxhash
 
-from grc_utils import ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word
+from grc_utils import ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, word_with_real_dichrona
 
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
@@ -52,9 +52,9 @@ class Text:
         before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
-        before_odycy = before_odycy.replace('τἄλλα', 'τἄλλα^')
-        before_odycy = before_odycy.replace('ἁ', 'ἁ_')
-        before_odycy = before_odycy.replace('ἁγίασμα', 'ἁ^γί^α^σμα^')
+        before_odycy = re.sub(r'\bτἄλλα\b', 'τἄλλα^', before_odycy)
+        before_odycy = re.sub(r'\bἁ\b', 'ἁ_', before_odycy)
+        before_odycy = re.sub(r'\bἁγίασμα\b', 'ἁ^γί^α^σμα^', before_odycy)
         ###
 
         if debug: 
@@ -62,7 +62,7 @@ class Text:
 
         diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
-        sentence_list = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', before_odycy) if sentence] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
+        sentence_list = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', before_odycy) if sentence and word_with_real_dichrona(sentence)] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
         if debug:
             logging.debug(f'Split input into {len(sentence_list)} sentences.')
             for i, sentence in enumerate(sentence_list):

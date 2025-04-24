@@ -4,20 +4,16 @@ import time
 from grc_macronizer import Macronizer
 from grc_utils import colour_dichrona_in_open_syllables
 
+macronizer = Macronizer(make_prints=False, doc_from_file=False)
 
-if __name__ == "__main__":
+input = '''Ἦσάν τε μετὰ θύελλάν τε, φάει'''
 
-    macronizer = Macronizer(make_prints=False, doc_from_file=False)
+time_start = time.time()
+output = macronizer.macronize(input)
+time_end = time.time()
 
-    input = '''Ἦσάν τε μετὰ θύελλάν τε, φάει'''
-    input = "αὐτόμᾰτον ἐκτετᾰκὸς καὶ σῠνεστᾰλκός"
+output_split = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', output) if sentence]
+for line in output_split[:500]:
+    print(colour_dichrona_in_open_syllables(line))
 
-    time_start = time.time()
-    output = macronizer.macronize(input)
-    time_end = time.time()
-
-    output_split = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', output) if sentence]
-    for line in output_split[:500]:
-        print(colour_dichrona_in_open_syllables(line))
-
-    print(f"Time taken: {time_end - time_start:.2f} seconds")
+print(f"Time taken: {time_end - time_start:.2f} seconds")
