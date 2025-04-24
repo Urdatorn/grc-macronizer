@@ -120,6 +120,13 @@ class Macronizer:
         word = normalize_word(word)
 
         macronized = hypotactic.get(word)
+        
+        if macronized:
+            syllable_list = syllabifier(macronized)
+            for i, syllable in enumerate(syllable_list):
+                if bool(re.search(combined_pattern, syllable)):
+                    syllable_list[i] = syllable.replace('^', '').replace('_', '') # demacronize diphthongs
+            macronized = "".join(syllable_list)
 
         return macronized
 
@@ -194,7 +201,6 @@ class Macronizer:
                     logging.debug(f'\t✅ Macronized neutre {token}')
                     return 'ἄλλα^' # neutre plural
 
-
             custom_token = custom_macronizer(macronized_token)
             if self.debug and custom_token != macronized_token:
                 logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
@@ -229,8 +235,19 @@ class Macronizer:
             else:
                 logging.debug(f'\t❌ Hypotactic did not help')
 
-            if count_dichrona_in_open_syllables(macronized_token) == 0:
-                return macronized_token
+            # ΕΧTRA ACCENT RULE INSTANCE FOR CORRECTION 
+            # NOTE: I found a bug (θύ^ελλα_ν) in hypotactic, whence by commenting out the below I make it possible for it to be overwritten and corrected by accent rules etc.
+            # if count_dichrona_in_open_syllables(macronized_token) == 0:
+            #     return macronized_token
+
+            old_macronized_token = macronized_token
+            accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
+            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                accent_rules_results.append(macronized_token)
+                logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Accent rules did not help')
             
             old_macronized_token = macronized_token
             lsj_token = lsj.get(token, token)
@@ -369,7 +386,7 @@ class Macronizer:
             # NOTE that what we need to handle is just that final accent can be on *the last or next to last syllable*. 
             '''
 
-            if not double_accent_pass:
+            if not double_accent_pass and len(normalize_word(token)) > 1:
                 accents = [char for char in token if char in ACCENTS]
                 if len(accents) > 1:
                     one_accent_token_last = ''
@@ -385,7 +402,9 @@ class Macronizer:
                     if one_accent_token_last:
                         one_accent_token_last = macronization_modules(one_accent_token_last, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
                         logging.debug(f'\t One-accent token macronized (last): {one_accent_token_last}')
-                        if one_accent_token_last[-1] == '^' or one_accent_token_last[-1] == '_':
+                        if one_accent_token_last[-1] == '_' or not one_accent_token_last: # no words with 2 accents have final long (they are either proparoxytone or properispomenon)
+                            pass
+                        elif one_accent_token_last[-1] == '^':
                             reconstituted_token = one_accent_token_last[:-2] + token[-1] + one_accent_token_last[-1]
                         else:
                             reconstituted_token = one_accent_token_last[:-1] + token[-1]
@@ -393,12 +412,14 @@ class Macronizer:
                     if one_accent_token_next_to_last:
                         one_accent_token_next_to_last = macronization_modules(one_accent_token_next_to_last, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=True)
                         logging.debug(f'\t One-accent token macronized (next to last): {one_accent_token_next_to_last}')
-                        if one_accent_token_next_to_last[-2] == '^' or one_accent_token_next_to_last[-1] == '_':
+                        if one_accent_token_next_to_last[-2] == '_' or not one_accent_token_next_to_last: # no words with 2 accents have final long (they are either proparoxytone or properispomenon)
+                            pass
+                        elif one_accent_token_next_to_last[-2] == '^':
                             reconstituted_token = one_accent_token_next_to_last[:-3] + token[-2] + one_accent_token_next_to_last[-2] + token[-1]
                         else:
                             reconstituted_token = one_accent_token_next_to_last[:-2] + token[-2:]
-                        
-                    macronized_token = merge_or_overwrite_markup(reconstituted_token, macronized_token)
+                    if reconstituted_token:    
+                        macronized_token = merge_or_overwrite_markup(reconstituted_token, macronized_token)
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         double_accent_recursion_results.append(macronized_token)
                         logging.debug(f'\t✅ Double accent macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -803,7 +824,7 @@ class Macronizer:
 
         merged = merge_or_overwrite_markup(new_version, old_version)
 
-        assert not macronized_diphthong(merged), f"Watch out! We just macronized a diphthong: {merged}"
+        assert not macronized_diphthong(merged), f"Watch out! apply_accentuation_rules just macronized a diphthong: {merged}"
         return merged
     
     def lemma_generalization(self, macronized_token, lemma):

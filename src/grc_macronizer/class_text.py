@@ -54,6 +54,7 @@ class Text:
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
         before_odycy = before_odycy.replace('τἄλλα', 'τἄλλα^')
         before_odycy = before_odycy.replace('ἁ', 'ἁ_')
+        before_odycy = before_odycy.replace('ἁγίασμα', 'ἁ^γί^α^σμα^')
         ###
 
         if debug: 

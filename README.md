@@ -1,4 +1,6 @@
-# grc-macronizer: A Macronizer for Ancient Greek
+# A Macronizer for Ancient Greek
+
+![cast](docs/media/macronizer.gif)
 
 A macronizer geared towards batch macronizing corpora with machine-friendly markup, avoiding combining diacritics and everything that doesn't render in standard IDE and terminal fonts unless specifically asked for.
 
