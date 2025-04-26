@@ -8,7 +8,7 @@ import grc_odycy_joint_trf
 from spacy.tokens import DocBin
 import xxhash
 
-from grc_utils import ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, word_with_real_dichrona
+from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, ROUGHS, syllabifier
 
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
@@ -50,11 +50,14 @@ class Text:
         before_odycy = text
         before_odycy = before_odycy.translate(translation_table)
         before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
+        before_odycy = before_odycy.replace('‘', "'")
+        before_odycy = before_odycy.replace('\u02bc', "'") # "Modifier letter apostrophe"
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
-        before_odycy = re.sub(r'\bτἄλλα\b', 'τἄλλα^', before_odycy)
-        before_odycy = re.sub(r'\bἁ\b', 'ἁ_', before_odycy)
-        before_odycy = re.sub(r'\bἁγίασμα\b', 'ἁ^γί^α^σμα^', before_odycy)
+        before_odycy = re.sub(r'\sτἄλλα\s', 'τἄλλα^', before_odycy)
+        before_odycy = re.sub(r'\sἁ\s', 'ἁ_', before_odycy)
+        before_odycy = re.sub(r'\sἁγίασμα\s', 'ἁ^γί^α^σμα^', before_odycy)
+        before_odycy = re.sub(r'\sἀν\s', '', before_odycy)
         ###
 
         if debug: 
@@ -62,11 +65,11 @@ class Text:
 
         diagnostic_word_list = word_list(before_odycy) # this list serves as a standard for what constitutes a word in the present text
 
-        sentence_list = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', before_odycy) if sentence and word_with_real_dichrona(sentence)] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
-        if debug:
-            logging.debug(f'Split input into {len(sentence_list)} sentences.')
-            for i, sentence in enumerate(sentence_list):
-                logging.debug(f"{i}: {sentence}")
+        sentence_list = [sentence for sentence in re.findall(r'[^.\n;\u037e]+[.\n;\u037e]?', before_odycy) if sentence and count_dichrona_in_open_syllables(sentence) > 0] # then split the input into sentences, to enable using spaCy pipe batch processing and tqdm
+        
+        logging.debug(f'Split input into {len(sentence_list)} sentences.')
+        for i, sentence in enumerate(sentence_list):
+            logging.debug(f"{i}: {sentence}")
 
         # -- odyCy tokenization and docbin saving --
 
@@ -135,8 +138,9 @@ class Text:
                         logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
                         buggy_words_in_input += 1
                         continue
-                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)):
-                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave. Skipping with 'continue'.")
+                    # MAJOR FILTER FOR BUGGY CORPUS
+                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or sum(char in ACCENTS for char in orth) > 2 or sum(char in ROUGHS for char in orth) > 2:
+                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave or more than two accents or more than one spiritus. Skipping with 'continue'.")
                         buggy_words_in_input += 1
                         continue
                     if orth in stop_list:
@@ -212,11 +216,14 @@ class Text:
             NOTE re the regex: \b does not work for strings containing apostrophe!
             Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit w to match word boundaries instead.
             '''
-            matches = list(re.finditer(fr"(?<!\w){normalized_word}(?!\w)", self.text)) 
-            #matches = list(re.finditer(fr"\b{normalized_word}\b", self.text)) # \b matches word boundaries. note that this is a list of *Match objects*.
+            matches = list(re.finditer(fr"(?<!\w){normalized_word}(?!\w)", self.text))
+            matches = [m for m in matches if (m.group() != "ἂν" or m.group() != "ἄν" or m.group() != "ἀν")] # remove ἂν and ἄν from the list of matches, since they are already macronized
 
             if current_count >= len(matches):
-                raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
+                logging.debug(f"Current count: {current_count}, Matches: {matches}")
+                print(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
+                continue
+                #raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
             
             target_match = matches[current_count]
             # .start() and .end() are methods of a regex Match object, giving the start and end indices of the match

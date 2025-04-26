@@ -76,6 +76,8 @@ custom_macron_map = {
     "Μεγαρεύς": "Μεγα^ρεύς",
     "μυρίος": "μυ_ρί^ος",
     "μυρίοι": "μυ_ρί^οι",
+    "πιτυίνη": "πι^τυ^ί^νη", # interesting example of word that if not written with ¨ in feminine looks like a macronized diphthong
+    "πιτυΐνη": "πι^τυ^ΐ^νη",
     
     # Numerals
 

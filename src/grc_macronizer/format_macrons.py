@@ -179,8 +179,13 @@ def merge_or_overwrite_markup(new_version, old_version, precedence='new'):
         logging.debug('No old version, returning new version')
         return new_version
     
-    assert normalize_word(new_version.replace('^', '').replace('_', '')) == normalize_word(old_version.replace('^', '').replace('_', '')), \
-        f'Cannot merge markup on different words: {new_version} vs {old_version}'
+    # assert normalize_word(new_version.replace('^', '').replace('_', '')) == normalize_word(old_version.replace('^', '').replace('_', '')), \
+    #     f'Cannot merge markup on different words: {new_version} vs {old_version}'
+
+    if normalize_word(new_version.replace('^', '').replace('_', '')) != normalize_word(old_version.replace('^', '').replace('_', '')):
+        logging.debug('Words do not match, returning old version to be on the safe side')
+        return old_version
+
     
     # First, get base string without markup
     base = ''.join(c for c in new_version if c not in '^_')

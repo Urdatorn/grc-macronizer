@@ -7,6 +7,7 @@ from grc_utils import colour_dichrona_in_open_syllables
 macronizer = Macronizer(make_prints=False, doc_from_file=False)
 
 input = '''Ἦσάν τε μετὰ θύελλάν τε, φάει'''
+input = '''ἐπίβλάβία τε'''
 
 time_start = time.time()
 output = macronizer.macronize(input)
