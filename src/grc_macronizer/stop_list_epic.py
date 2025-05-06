@@ -11,4 +11,15 @@ NOTE: the Hypotactic database in particular is "contaminated" by Homer, and so i
 
 epic_stop_words = [
     'ἀνήρ'
+
+    'καλός' # original digamma
+    'καλὸς'
+    'καλά'
+    'καλὰ'
+    
+    'Κύπριδος' # ι long depending on position
+    'Κύπριδι'
+    'Κύπριδα'
+    'Κύπριν',
+    'ἀνιαρός',
 ]

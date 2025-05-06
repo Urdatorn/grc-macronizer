@@ -9,7 +9,7 @@ import re
 
 from tqdm import tqdm
 
-from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
+from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, patterns, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 
 from .ascii import ascii_macronizer
 from .barytone import replace_grave_with_acute, replace_acute_with_grave
@@ -58,9 +58,9 @@ with hypotactic_path.open("rb") as f:
 
 # Function to detect accidentally macronized diphthongs
 
-diphth_y = r'[αεηο][ὐὔυὑύὖῦὕὗὺὒὓ]'
-diphth_i = r'[αεου][ἰίιῖἴἶἵἱἷὶἲἳ]'
-adscr_i = r'[αηωἀἠὠἁἡὡάήώὰὴὼᾶῆῶὤὥὢὣἄἅἂἃἤἥἣἢἦἧἆἇὧὦ]ι'
+diphth_i = patterns['diphth_i']
+diphth_y = patterns['diphth_y']
+adscr_i = patterns['adscr_i']
 
 combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
 
@@ -87,13 +87,15 @@ class Macronizer:
                  make_prints=True,
                  unicode=False,
                  debug=False,
-                 doc_from_file=True):
+                 doc_from_file=True,
+                 no_hypotactic=False):
 
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
         self.unicode = unicode
         self.debug = debug
         self.doc_from_file = doc_from_file
+        self.no_hypotactic = no_hypotactic
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -116,6 +118,9 @@ class Macronizer:
         >>> hypotactic('ἀγαθῆς')
         >>> ἀ^γα^θῆς
         '''
+        if self.no_hypotactic:
+            return word
+
         word = word.replace('^', '').replace('_', '')
         word = normalize_word(word)
 

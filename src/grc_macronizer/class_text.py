@@ -54,10 +54,10 @@ class Text:
         before_odycy = before_odycy.replace('\u02bc', "'") # "Modifier letter apostrophe"
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
+        preemptive_macronization = {"ἄ^ν", "ἂ^ν", "ἄ_ν", "ἂ_ν", "τἄλλα^", "ἁ_"}
+
         before_odycy = re.sub(r'\sτἄλλα\s', 'τἄλλα^', before_odycy)
         before_odycy = re.sub(r'\sἁ\s', 'ἁ_', before_odycy)
-        before_odycy = re.sub(r'\sἁγίασμα\s', 'ἁ^γί^α^σμα^', before_odycy)
-        before_odycy = re.sub(r'\sἀν\s', '', before_odycy)
         ###
 
         if debug: 
@@ -153,17 +153,15 @@ class Text:
                         fail_counter += 1
                         logging.debug(f"\033Word '{orth}' not in diagnostic word list. odyCy messed up here. Skipping with 'continue'.")
                         continue
-                    if token.text == 'ἂν' or token.text == 'ἄν':
-                        orth = an_list.pop(0)
-                        logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
 
                     # For speed, let's not bother even sending words without dichrona to the macronizer
                     if count_dichrona_in_open_syllables(orth) == 0 and orth not in ['ἂν_', 'ἂν^', 'ἄν_', 'ἄν^']:
                         logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
                         continue
-                    # if not token.morph:
-                    #     logging.debug(f"\033{orth} has no morph. Appending morph as None.")
-                    #     token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, None])
+                    if token.text == 'ἂν' or token.text == 'ἄν':
+                        macronized_an = an_list.pop(0)
+                        token_lemma_pos_morph.append([macronized_an, token.lemma_, token.pos_, token.morph])
+                        logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
                     else:
                         token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
                     logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
