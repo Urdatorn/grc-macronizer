@@ -40,7 +40,7 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, debug=False):
+    def __init__(self, text, genre='prose', doc_from_file=True, custom_doc="", debug=False):
         
         # -- Prepare the text for odyCy --
 
@@ -89,7 +89,11 @@ class Text:
         output_file_name = odycy_docs_dir / filename
 
         docs = []
-        if doc_from_file and output_file_name.exists():  # pathlib-style check
+        if custom_doc != "":
+            doc_bin = DocBin().from_disk(custom_doc)
+            nlp = grc_odycy_joint_trf.load()
+            docs = list(doc_bin.get_docs(nlp.vocab))
+        elif doc_from_file and output_file_name.exists():  # pathlib-style check
             doc_bin = DocBin().from_disk(output_file_name)
             nlp = grc_odycy_joint_trf.load()
             docs = list(doc_bin.get_docs(nlp.vocab))
@@ -111,7 +115,7 @@ class Text:
         macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
         for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
             for token in doc:
-                logging.debug(f"Considering token: {token.text}\tOrth: {token.orth_}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
+                logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                 if token.text == 'ἂν' or token.text == 'ἄν':
                     an = token.text
                     subjunctive_verb = False
