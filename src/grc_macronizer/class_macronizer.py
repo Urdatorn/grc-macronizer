@@ -88,7 +88,8 @@ class Macronizer:
                  unicode=False,
                  debug=False,
                  doc_from_file=True,
-                 no_hypotactic=False):
+                 no_hypotactic=False,
+                 custom_doc=""):
 
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
@@ -96,6 +97,7 @@ class Macronizer:
         self.debug = debug
         self.doc_from_file = doc_from_file
         self.no_hypotactic = no_hypotactic
+        self.custom_doc = custom_doc
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -151,7 +153,7 @@ class Macronizer:
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
-        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug)
+        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of module efficacy
