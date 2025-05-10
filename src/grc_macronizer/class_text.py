@@ -10,6 +10,7 @@ import xxhash
 
 from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, ROUGHS, syllabifier
 
+from .conllu import parse_conllu_file
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
 from .nominal_forms import macronize_nominal_forms
@@ -40,7 +41,7 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, custom_doc="", debug=False):
+    def __init__(self, text, genre='prose', doc_from_file=True, custom_doc="", conllu_file_path="", debug=False):
         
         # -- Prepare the text for odyCy --
 
@@ -89,7 +90,9 @@ class Text:
         output_file_name = odycy_docs_dir / filename
 
         docs = []
-        if custom_doc != "":
+        if conllu_file_path != "":
+            pass
+        elif custom_doc != "":
             doc_bin = DocBin().from_disk(custom_doc)
             nlp = grc_odycy_joint_trf.load()
             docs = list(doc_bin.get_docs(nlp.vocab))
@@ -105,71 +108,182 @@ class Text:
                 doc_bin.add(doc)
             logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
             doc_bin.to_disk(output_file_name)
-
+        
+        #
         # -- Preparing the master list of words to be macronized (and handling ἄν) -- (NOTE often THE key step in analyzing nonplussing bugs)
+        #
+
+        def should_skip_word(orth: str) -> bool:
+            """Helper method to determine if a word should be skipped due to malformations."""
+            # Check for final sigma in non-final position
+            if 'ς' in list(orth[:-1]):
+                logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping.")
+                return True
+                
+            # Check for multiple accents or breathing marks
+            if (sum(char in GRAVES for char in orth) > 1 or
+                (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or
+                sum(char in ACCENTS for char in orth) > 2 or
+                sum(char in ROUGHS for char in orth) > 2):
+                logging.debug(f"Pathological word '{orth}' contains multiple accents or breathing issues. Skipping.")
+                return True
+                
+            return False
 
         an_list = []
         fail_counter = 0
         buggy_words_in_input = 0
         token_lemma_pos_morph = []
-        macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
-        for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
-            for token in doc:
-                logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
-                if token.text == 'ἂν' or token.text == 'ἄν':
-                    an = token.text
-                    subjunctive_verb = False
-                    no_ei = True
-                    logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token.text}")
-                    for inner_token in doc:
-                        if inner_token.morph.get("Mood") == "Sub":
-                            subjunctive_verb = True
-                            logging.debug(f"\t\tSubjunctive verb found: {inner_token.text}")
-                        if inner_token.text == 'εἰ' or inner_token.text == 'εἴ':
-                            no_ei = False
-                            logging.debug(f"\t\tEi found: {inner_token.text}")
-                    if subjunctive_verb and no_ei:
-                        an_list.append(an[0] + '_' + an[1])
-                        logging.debug(f"\t\tLong ἂν macronized")
-                    else: 
-                        an_list.append(an[0] + '^' + an[1])
-                        logging.debug(f"\t\tShort ἂν macronized")
+        macronized_nominal_forms = []
 
-                if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.
-                    orth = token.text.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
-                    logging.debug(f"\t'Token text: {orth}")
-                    if 'ς' in list(orth[:-1]):
-                        logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
+        #
+        # CONLL-U LOGIC
+        #
+
+        if conllu_file_path:
+            sentences = parse_conllu_file(conllu_file_path)
+            
+            # First pass: process ἂν/ἄν conditions
+            for sentence in tqdm(sentences, desc="Processing ἂν/ἄν conditions", leave=False):
+                for token in sentence:
+                    if token['text'] in ('ἂν', 'ἄν'):
+                        an = token['text']
+                        subjunctive_verb = False
+                        no_ei = True
+                        logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token['text']}")
+                        
+                        # Check for subjunctive verbs and εἰ/εἴ
+                        for inner_token in sentence:
+                            if inner_token['morph'].get("Mood") == "Sub":
+                                subjunctive_verb = True
+                                logging.debug(f"\t\tSubjunctive verb found: {inner_token['text']}")
+                            if inner_token['text'] in ('εἰ', 'εἴ'):
+                                no_ei = False
+                                logging.debug(f"\t\tEi found: {inner_token['text']}")
+                        
+                        # Determine macronization based on conditions
+                        if subjunctive_verb and no_ei:
+                            an_list.append(an[0] + '_' + an[1])
+                            logging.debug(f"\t\tLong ἂν macronized")
+                        else: 
+                            an_list.append(an[0] + '^' + an[1])
+                            logging.debug(f"\t\tShort ἂν macronized")
+            
+            # Second pass: process all tokens
+            for sentence in tqdm(sentences, desc="Macronizing tokens", leave=False):
+                for token in sentence:
+                    if not token['text'] or not token['pos']:
+                        continue
+                        
+                    # Clean the orthographic form
+                    orth = token['text'].replace('\u0387', '').replace('\u037e', '')
+                    logging.debug(f"\tToken text: {orth}")
+                    
+                    # Skip words with various issues
+                    if should_skip_word(orth):
                         buggy_words_in_input += 1
                         continue
-                    # MAJOR FILTER FOR BUGGY CORPUS
-                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or sum(char in ACCENTS for char in orth) > 2 or sum(char in ROUGHS for char in orth) > 2:
-                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave or more than two accents or more than one spiritus. Skipping with 'continue'.")
-                        buggy_words_in_input += 1
-                        continue
+                    
+                    # Skip words from stop lists
                     if orth in stop_list:
-                        logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
+                        logging.info(f"\033General stop word '{orth}' found. Skipping.")
                         continue
+                    
                     if genre == 'epic' and orth in epic_stop_words:
-                        logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
+                        logging.info(f"\033Epic stop word '{orth}' found. Skipping.")
                         continue
-                    if orth not in diagnostic_word_list and orth != 'ἂν' and orth != 'ἄν':
+                    
+                    # Skip non-diagnostic words (except ἂν/ἄν)
+                    if orth not in diagnostic_word_list and orth not in ('ἂν', 'ἄν'):
                         fail_counter += 1
-                        logging.debug(f"\033Word '{orth}' not in diagnostic word list. odyCy messed up here. Skipping with 'continue'.")
+                        logging.debug(f"\033Word '{orth}' not in diagnostic word list. Skipping.")
                         continue
-
-                    # For speed, let's not bother even sending words without dichrona to the macronizer
+                    
+                    # Skip words without dichrona (except special ἂν/ἄν forms)
                     if count_dichrona_in_open_syllables(orth) == 0 and orth not in ['ἂν_', 'ἂν^', 'ἄν_', 'ἄν^']:
-                        logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
+                        logging.debug(f"\033Word '{orth}' has no dichrona. Skipping.")
                         continue
-                    if token.text == 'ἂν' or token.text == 'ἄν':
+                    
+                    # Process token based on type
+                    if token['text'] in ('ἂν', 'ἄν'):
                         macronized_an = an_list.pop(0)
-                        token_lemma_pos_morph.append([macronized_an, token.lemma_, token.pos_, token.morph])
+                        token_lemma_pos_morph.append([macronized_an, token['lemma'], token['pos'], token['morph']])
                         logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
                     else:
-                        token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
-                    logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
-                    macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
+                        token_lemma_pos_morph.append([orth, token['lemma'], token['pos'], token['morph']])
+                    
+                    logging.debug(f"\tAppended: \tToken: {token['text']}\tLemma: {token['lemma']}\tPOS: {token['pos']}\tMorph: {token['morph']}")
+                    macronized_nominal_forms.append(
+                        macronize_nominal_forms(orth, token['lemma'], token['pos'], token['morph'], debug=False)
+                    )
+
+        #
+        # SPACY LOGIC
+        #
+
+        else: 
+            an_list = []
+            fail_counter = 0
+            buggy_words_in_input = 0
+            token_lemma_pos_morph = []
+            macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
+            for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
+                for token in doc:
+                    logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
+                    if token.text == 'ἂν' or token.text == 'ἄν':
+                        an = token.text
+                        subjunctive_verb = False
+                        no_ei = True
+                        logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token.text}")
+                        for inner_token in doc:
+                            if inner_token.morph.get("Mood") == "Sub":
+                                subjunctive_verb = True
+                                logging.debug(f"\t\tSubjunctive verb found: {inner_token.text}")
+                            if inner_token.text == 'εἰ' or inner_token.text == 'εἴ':
+                                no_ei = False
+                                logging.debug(f"\t\tEi found: {inner_token.text}")
+                        if subjunctive_verb and no_ei:
+                            an_list.append(an[0] + '_' + an[1])
+                            logging.debug(f"\t\tLong ἂν macronized")
+                        else: 
+                            an_list.append(an[0] + '^' + an[1])
+                            logging.debug(f"\t\tShort ἂν macronized")
+
+                    if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.
+                        orth = token.text.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
+                        logging.debug(f"\t'Token text: {orth}")
+                        if 'ς' in list(orth[:-1]):
+                            logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
+                            buggy_words_in_input += 1
+                            continue
+                        # MAJOR FILTER FOR BUGGY CORPUS
+                        if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or sum(char in ACCENTS for char in orth) > 2 or sum(char in ROUGHS for char in orth) > 2:
+                            logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave or more than two accents or more than one spiritus. Skipping with 'continue'.")
+                            buggy_words_in_input += 1
+                            continue
+                        if orth in stop_list:
+                            logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
+                            continue
+                        if genre == 'epic' and orth in epic_stop_words:
+                            logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
+                            continue
+                        if orth not in diagnostic_word_list and orth != 'ἂν' and orth != 'ἄν':
+                            fail_counter += 1
+                            logging.debug(f"\033Word '{orth}' not in diagnostic word list. odyCy messed up here. Skipping with 'continue'.")
+                            continue
+
+                        # For speed, let's not bother even sending words without dichrona to the macronizer
+                        if count_dichrona_in_open_syllables(orth) == 0 and orth not in ['ἂν_', 'ἂν^', 'ἄν_', 'ἄν^']:
+                            logging.debug(f"\033Word '{orth}' has no dichrona. Skipping with 'continue'.")
+                            continue
+                        if token.text == 'ἂν' or token.text == 'ἄν':
+                            macronized_an = an_list.pop(0)
+                            token_lemma_pos_morph.append([macronized_an, token.lemma_, token.pos_, token.morph])
+                            logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
+                        else:
+                            token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
+                        logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
+                        macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
         assert an_list == [], f"An list is not empty: {an_list}. This means that the ἂν macronization step failed. Please check the code."
         logging.debug(f'Len of token_lemma_pos_morph: {len(token_lemma_pos_morph)}')

@@ -2,12 +2,12 @@ import re
 import time
 
 from grc_macronizer import Macronizer
-from grc_macronizer.tests.hiketides import hiketides # "Supplices" av Sofokles
-from grc_macronizer.tests.anabasis import anabasis # "Anabasis" av Xenofon
+from grc_macronizer.tests.hiketides import hiketides # "Supplices" by Sophokles
+from grc_macronizer.tests.anabasis import anabasis # "Anabasis" av Xenophon
 
 from grc_utils import colour_dichrona_in_open_syllables
 
-macronizer = Macronizer()
+macronizer = Macronizer(no_hypotactic=True)
 
 input = anabasis
 
