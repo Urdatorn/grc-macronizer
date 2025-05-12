@@ -87,31 +87,29 @@ def convert_ud_morph_value_to_spacy(feature: str, value: str) -> str:
     
     return value  # Default to original value if no mapping exists
 
-def convert_ud_morph_to_spacy_morph(ud_feats: str) -> Dict[str, str]:
+def convert_ud_morph_to_spacy_morph(ud_feats: str) -> str:
     """
-    Convert UD morphological features string to a spaCy-style morph dictionary.
+    Convert UD morphological features string to a spaCy-style morph string.
     
     Args:
         ud_feats: The UD format features string (e.g. "Case=n|Gender=m|Number=s")
         
     Returns:
-        A dictionary with proper spaCy-style morphological features
+        A spaCy-style morphological features string (e.g. "Case=Nom|Gender=Masc|Number=Sing")
     """
-    morph_dict = {}
     if ud_feats == '_':
-        return morph_dict
+        return ''
         
+    spacy_feats = []
     for feat in ud_feats.split('|'):
         if '=' not in feat:
             continue
             
         key, value = feat.split('=')
-        
         spacy_value = convert_ud_morph_value_to_spacy(key, value)
+        spacy_feats.append(f"{key}={spacy_value}")
         
-        morph_dict[key] = spacy_value
-        
-    return morph_dict
+    return '|'.join(spacy_feats)
 
 def parse_conllu_file(conllu_file_path: str) -> List[List[Dict[str, Any]]]:
     """
