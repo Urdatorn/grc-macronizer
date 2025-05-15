@@ -10,7 +10,7 @@ import xxhash
 
 from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, ROUGHS, syllabifier
 
-from .conllu import parse_conllu_file, Morph
+from .conllu_support import parse_conllu_file, Morph
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
 from .nominal_forms import macronize_nominal_forms
