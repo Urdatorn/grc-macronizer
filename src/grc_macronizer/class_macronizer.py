@@ -9,18 +9,19 @@ import re
 
 from tqdm import tqdm
 
-from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, patterns, proparoxytone, properispomenon, short_vowel, syllabifier, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
+from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, patterns, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 
 from .ascii import ascii_macronizer
 from .barytone import replace_grave_with_acute, replace_acute_with_grave
 from .class_text import Text
 from .db.custom import custom_macronizer
+from .db.lsj import lsj
+from .db.proper_names import proper_names
 from .db.wiktionary_ambiguous import wiktionary_ambiguous_map
 from .db.wiktionary_singletons import wiktionary_singletons_map
 from .format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
-from .db.proper_names import proper_names
-from .db.lsj import lsj
 from .morph_disambiguator import morph_disambiguator
+from .nominal_forms import macronize_nominal_forms
 from .verbal_forms import macronize_verbal_forms
 
 # --- Preamble ---
@@ -106,14 +107,24 @@ class Macronizer:
         Should return with macron_unicode_to_markup
         """
         word = normalize_word(no_macrons(word.replace('^', '').replace('_', '')))
+        word_lower = lower_grc(word[0]) + word[1:]
         
         if word in wiktionary_singletons_map:
             disambiguated = wiktionary_singletons_map[word][0][0] # get the db_word singleton content
             return macron_unicode_to_markup(disambiguated)
+        elif word_lower in wiktionary_singletons_map:
+            disambiguated = wiktionary_singletons_map[word_lower][0][0]
+            word_recapitalized = upper_grc(disambiguated[0]) + disambiguated[1:]
+            return macron_unicode_to_markup(word_recapitalized)
         elif word in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
             match = wiktionary_ambiguous_map[word]
             disambiguated = morph_disambiguator(word, lemma, pos, morph, token=match[0], tense=match[1], case_voice=match[2], mode=match[3], person=match[4], number=match[5])
             return macron_unicode_to_markup(disambiguated)
+        elif word_lower in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
+            match = wiktionary_ambiguous_map[word]
+            disambiguated = morph_disambiguator(word, lemma, pos, morph, token=match[0], tense=match[1], case_voice=match[2], mode=match[3], person=match[4], number=match[5])
+            word_recapitalized = upper_grc(disambiguated[0]) + disambiguated[1:]
+            return macron_unicode_to_markup(word_recapitalized)
         else:
             return word
     
@@ -274,13 +285,23 @@ class Macronizer:
             ### ALGORITHMIC MODULES ###
 
             old_macronized_token = macronized_token
-            nominal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
+            nominal_forms_token = macronize_nominal_forms(token, lemma, pos, morph, debug=self.debug)
             macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 nominal_forms_results.append(macronized_token)
                 logging.debug(f'\t✅ Nominal forms helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Nominal forms did not help')
+
+
+            old_macronized_token = macronized_token
+            verbal_forms_token = macronize_verbal_forms(token, lemma, pos, morph, debug=self.debug)
+            macronized_token = merge_or_overwrite_markup(verbal_forms_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                verbal_forms_results.append(macronized_token)
+                logging.debug(f'\t✅ Verbal forms helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Verbal forms did not help')
             
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
@@ -651,8 +672,11 @@ class Macronizer:
 
             macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
             token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
-            #assert not macronized_diphthong(macronized_token), f"Watch out! We just macronized a diphthong: {macronized_token}"
             assert macronized_normalized_for_checking == token_normalized_for_checking, f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace('^', '').replace('_', '')}"
+            
+            # SANITY CHECK 
+            if macronized_diphthong(macronized_token):
+                return token
 
             return macronized_token
 
@@ -833,10 +857,9 @@ class Macronizer:
 
         merged = merge_or_overwrite_markup(new_version, old_version)
 
-        #assert not macronized_diphthong(merged), f"Watch out! apply_accentuation_rules just macronized a diphthong: {merged}"
         if macronized_diphthong(merged):
-            print(f"Watch out! apply_accentuation_rules just macronized a diphthong: {merged}")
-            logging.debug(f"Watch out! apply_accentuation_rules just macronized a diphthong: {merged}")
+            logging.debug(f"apply_accentuation_rules just macronized a diphthong, so we returned the old version: {merged}")
+            return old_version
         return merged
     
     def lemma_generalization(self, macronized_token, lemma):

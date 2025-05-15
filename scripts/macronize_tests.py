@@ -3,7 +3,7 @@ import time
 
 from grc_macronizer import Macronizer
 from grc_macronizer.tests.hiketides import hiketides # "Supplices" by Sophokles
-from grc_macronizer.tests.anabasis import anabasis # "Anabasis" av Xenophon
+from grc_macronizer.tests.anabasis import anabasis, anabasis_medium, anabasis_short # "Anabasis" av Xenophon
 
 from grc_utils import colour_dichrona_in_open_syllables
 

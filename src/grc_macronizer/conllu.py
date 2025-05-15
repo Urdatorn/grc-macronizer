@@ -10,7 +10,35 @@ Contents from higher to lower level:
 
 '''
 
-from typing import List, Dict, Any
+from conllu import parse
+import spacy
+from spacy.tokens import Doc
+
+class Morph:
+    def __init__(self, morph_str: str):
+        # Initialize with a string representing the morphological features
+        self.morph_str = morph_str
+        self.features = self._parse_morphology(morph_str)
+    
+    def _parse_morphology(self, morph_str: str) -> dict:
+        # Parse the morph string into a dictionary like 'key=value'
+        features = {}
+        for feature in morph_str.split('|'):
+            if '=' in feature:
+                key, value = feature.split('=')
+                features[key] = value
+        return features
+    
+    def get(self, feature: str) -> str:
+        # Mimic SpaCy's morph.get method to return a feature value
+        return self.features.get(feature, '')
+
+    def to_dict(self) -> dict:
+        # Return the features as a dictionary
+        return self.features
+    
+    def __repr__(self):
+        return f"Morph({self.morph_str})"
 
 UD_VALUE_TO_SPACY = {
     "Case": {
@@ -75,88 +103,65 @@ UD_VALUE_TO_SPACY = {
 }
 
 def convert_ud_morph_value_to_spacy(feature: str, value: str) -> str:
-    """
-    Convert UD morphological feature values to spaCy style.
-    UD typically uses lowercase abbreviations (n, m, s) while 
-    spaCy uses longer forms with uppercase first letter (Nom, Masc, Sing).
-    """
-    
-    # Use the class-level dictionary for default mappings
+    """Convert UD morph feature values to SpaCy-friendly values."""
     if feature in UD_VALUE_TO_SPACY and value in UD_VALUE_TO_SPACY[feature]:
         return UD_VALUE_TO_SPACY[feature][value]
-    
-    return value  # Default to original value if no mapping exists
+    return value
 
 def convert_ud_morph_to_spacy_morph(ud_feats: str) -> str:
-    """
-    Convert UD morphological features string to a spaCy-style morph string.
-    
-    Args:
-        ud_feats: The UD format features string (e.g. "Case=n|Gender=m|Number=s")
-        
-    Returns:
-        A spaCy-style morphological features string (e.g. "Case=Nom|Gender=Masc|Number=Sing")
-    """
-    if ud_feats == '_':
+    """Convert UD features to SpaCy morphological features format."""
+    if ud_feats == '_' or not ud_feats:
         return ''
-        
     spacy_feats = []
     for feat in ud_feats.split('|'):
         if '=' not in feat:
             continue
-            
         key, value = feat.split('=')
         spacy_value = convert_ud_morph_value_to_spacy(key, value)
         spacy_feats.append(f"{key}={spacy_value}")
-        
     return '|'.join(spacy_feats)
 
-def parse_conllu_file(conllu_file_path: str) -> List[List[Dict[str, Any]]]:
-    """
-    Parse a CoNLL-U file and return a list of sentences, where each sentence
-    is a list of token dictionaries.
-    """
-    sentences = []
-    current_sentence = []
-    
-    with open(conllu_file_path, 'r', encoding='utf-8') as file:
-        for line in file:
-            line = line.strip()
-            
-            # Skip empty lines and comments
-            if not line or line.startswith('#'):
-                if current_sentence:
-                    sentences.append(current_sentence)
-                    current_sentence = []
-                continue
-            
-            # Parse token fields
-            fields = line.split('\t')
-            if len(fields) != 10:
-                continue  # Skip malformed lines
-            
-            # CoNLL-U fields
-            token_id, form, lemma, upos, xpos, feats, head, deprel, deps, misc = fields
-            
-            # Skip range tokens (like 1-2)
-            if '-' in token_id:
-                continue
-            
-            # Parse morphological features
-            morph_dict = convert_ud_morph_to_spacy_morph(feats)
-            
-            token = {
-                'id': token_id,
-                'text': form,
-                'lemma': lemma if lemma != '_' else '',
-                'pos': upos if upos != '_' else '',  # Use UPOS directly
-                'morph': morph_dict
-            }
-            
-            current_sentence.append(token)
+def parse_conllu_file(path: str):
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+    parsed_sentences = parse(content)
+    result = []
+
+    for sentence in parsed_sentences:
+        tokens = []
+        for token in sentence:
+            if isinstance(token, dict) and token.get("form") and token.get("upostag"):
+                tokens.append({
+                    "text": token["form"],
+                    "lemma": token.get("lemma", ""),
+                    "pos": token["upostag"],
+                    # Use Morph class here
+                    "morph": Morph(token.get("feats", "")) if token.get("feats") else Morph("")
+                })
+        result.append(tokens)
+
+    return result
+
+def create_spacy_doc_from_conllu(conllu_file_path: str, nlp: spacy.language.Language):
+    """Convert CONLL-U data into SpaCy Doc objects."""
+    sentences = parse_conllu_file(conllu_file_path)
+    docs = []
+
+    for sentence in sentences:
+        # Token texts (forms) of the sentence
+        words = [token['text'] for token in sentence]
         
-        # Don't forget the last sentence
-        if current_sentence:
-            sentences.append(current_sentence)
-    
-    return sentences
+        # SpaCy Doc object creation
+        doc = Doc(nlp.vocab, words=words)
+        
+        # Add the morph, pos, and lemma attributes to each token
+        for i, token in enumerate(doc):
+            spacy_token = doc[i]
+            spacy_token.lemma_ = sentence[i]['lemma']
+            spacy_token.pos_ = sentence[i]['pos']
+            spacy_token.morph = sentence[i]['morph']  # This is where you set the morph value
+            spacy_token.tag_ = sentence[i]['pos']  # Assuming POS as tag for simplicity
+
+        docs.append(doc)
+
+    return docs

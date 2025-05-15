@@ -10,7 +10,7 @@ import xxhash
 
 from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, ROUGHS, syllabifier
 
-from .conllu import parse_conllu_file
+from .conllu import parse_conllu_file, Morph
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
 from .nominal_forms import macronize_nominal_forms
@@ -134,7 +134,6 @@ class Text:
         fail_counter = 0
         buggy_words_in_input = 0
         token_lemma_pos_morph = []
-        macronized_nominal_forms = []
 
         #
         # CONLL-U LOGIC
@@ -142,7 +141,7 @@ class Text:
 
         if conllu_file_path:
             sentences = parse_conllu_file(conllu_file_path)
-            
+
             # First pass: process ἂν/ἄν conditions
             for sentence in tqdm(sentences, desc="Processing ἂν/ἄν conditions", leave=False):
                 for token in sentence:
@@ -151,71 +150,66 @@ class Text:
                         subjunctive_verb = False
                         no_ei = True
                         logging.debug(f"\t\tPROCESSING ἂν/ἄν: {token['text']}")
-                        
+
                         # Check for subjunctive verbs and εἰ/εἴ
                         for inner_token in sentence:
-                            if inner_token['morph'].get("Mood") == "Sub":
+                            if 'Mood' in inner_token['morph'] and inner_token['morph'].get('Mood') == "Sub":
                                 subjunctive_verb = True
                                 logging.debug(f"\t\tSubjunctive verb found: {inner_token['text']}")
                             if inner_token['text'] in ('εἰ', 'εἴ'):
                                 no_ei = False
                                 logging.debug(f"\t\tEi found: {inner_token['text']}")
-                        
+
                         # Determine macronization based on conditions
                         if subjunctive_verb and no_ei:
                             an_list.append(an[0] + '_' + an[1])
                             logging.debug(f"\t\tLong ἂν macronized")
-                        else: 
+                        else:
                             an_list.append(an[0] + '^' + an[1])
                             logging.debug(f"\t\tShort ἂν macronized")
-            
+
             # Second pass: process all tokens
             for sentence in tqdm(sentences, desc="Macronizing tokens", leave=False):
                 for token in sentence:
                     if not token['text'] or not token['pos']:
                         continue
-                        
-                    # Clean the orthographic form
+
                     orth = token['text'].replace('\u0387', '').replace('\u037e', '')
                     logging.debug(f"\tToken text: {orth}")
-                    
+
                     # Skip words with various issues
                     if should_skip_word(orth):
                         buggy_words_in_input += 1
                         continue
-                    
-                    # Skip words from stop lists
+
                     if orth in stop_list:
                         logging.info(f"\033General stop word '{orth}' found. Skipping.")
                         continue
-                    
+
                     if genre == 'epic' and orth in epic_stop_words:
                         logging.info(f"\033Epic stop word '{orth}' found. Skipping.")
                         continue
-                    
-                    # Skip non-diagnostic words (except ἂν/ἄν)
+
                     if orth not in diagnostic_word_list and orth not in ('ἂν', 'ἄν'):
                         fail_counter += 1
                         logging.debug(f"\033Word '{orth}' not in diagnostic word list. Skipping.")
                         continue
-                    
-                    # Skip words without dichrona (except special ἂν/ἄν forms)
+
                     if count_dichrona_in_open_syllables(orth) == 0 and orth not in ['ἂν_', 'ἂν^', 'ἄν_', 'ἄν^']:
                         logging.debug(f"\033Word '{orth}' has no dichrona. Skipping.")
                         continue
-                    
-                    # Process token based on type
+
+                    # Get the morph dict from the token's morph attribute (it should now be in the correct format)
+                    morph_dict = token['morph'].to_dict()  # Using the Morph class now
+
                     if token['text'] in ('ἂν', 'ἄν'):
                         macronized_an = an_list.pop(0)
-                        token_lemma_pos_morph.append([macronized_an, token['lemma'], token['pos'], token['morph']])
+                        token_lemma_pos_morph.append([macronized_an, token['lemma'], token['pos'], morph_dict])
                         logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
                     else:
-                        token_lemma_pos_morph.append([orth, token['lemma'], token['pos'], token['morph']])
-                    
-                    logging.debug(f"\tAppended: \tToken: {token['text']}\tLemma: {token['lemma']}\tPOS: {token['pos']}\tMorph: {token['morph']}")
-                    macronized_nominal_forms.append(
-                        macronize_nominal_forms(orth, token['lemma'], token['pos'], token['morph'], debug=False)
-                    )
+                        token_lemma_pos_morph.append([orth, token['lemma'], token['pos'], morph_dict])
+
+                    logging.debug(f"\tAppended: \tToken: {token['text']}\tLemma: {token['lemma']}\tPOS: {token['pos']}\tMorph: {morph_dict}")
 
         #
         # SPACY LOGIC
@@ -226,7 +220,6 @@ class Text:
             fail_counter = 0
             buggy_words_in_input = 0
             token_lemma_pos_morph = []
-            macronized_nominal_forms = [] # this will store all the words of all sentences, in the right order. this list will form the basis for the list in the macronize_text method of the Macronizer class
             for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
                 for token in doc:
                     logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
@@ -279,11 +272,10 @@ class Text:
                         if token.text == 'ἂν' or token.text == 'ἄν':
                             macronized_an = an_list.pop(0)
                             token_lemma_pos_morph.append([macronized_an, token.lemma_, token.pos_, token.morph])
-                            logging.debug(f"\033Popping an {orth}! {len(an_list)} left to pop")
+                            logging.debug(f"\033Popping an {macronized_an}! {len(an_list)} left to pop")
                         else:
                             token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
                         logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
-                        macronized_nominal_forms.append(macronize_nominal_forms(orth, token.lemma_, token.pos_, token.morph, debug=False))
 
         assert an_list == [], f"An list is not empty: {an_list}. This means that the ἂν macronization step failed. Please check the code."
         logging.debug(f'Len of token_lemma_pos_morph: {len(token_lemma_pos_morph)}')
@@ -297,12 +289,7 @@ class Text:
         self.genre = genre
         self.docs = docs
         self.token_lemma_pos_morph = token_lemma_pos_morph
-        self.macronized_nominal_forms = macronized_nominal_forms
-        self.macronized_words = [] # for now; this will contain the results of merging macronized_nominal_forms with the results of all other macronization methods
-        # for sublist, macronized_nominal_form in zip(token_lemma_pos_morph, macronized_nominal_forms):
-        #     token = sublist[0]
-        #     merge = merge_or_overwrite_markup(token, macronized_nominal_form)
-        #     self.macronized_words.append(merge)
+        self.macronized_words = [] # populated by class_macronizer
         self.macronized_text = ''
         self.debug = debug
 

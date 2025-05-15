@@ -45,6 +45,7 @@ For reference, here are all possible POS types in spaCy:
 The following have nominal forms in grc:
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
 '''
+import logging
 
 from grc_utils import only_bases
 
@@ -63,8 +64,10 @@ def macronize_nominal_stem_suffixes(word, lemma, pos, morph, debug=False):
     if only_bases(lemma)[-4:] == "ικος":
         if only_bases(word)[-4:] == "ικος" or only_bases(word)[-4:] == "ικον":
             return word[:-3] + "^" + word[-3:]
+    
+    return None
 
-def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
+def macronize_nominal_forms(word, lemma, pos, morph, debug=True):
     '''
     This function should only be called if ultima or penultima is not yet macronized.
     It is slow and because of its complexity, bug prone.
@@ -77,13 +80,11 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
 
     nominal_pos_tags = {"NOUN", "PROPN", "PRON", "NUM", "ADJ"}
 
-    # if pos not in nominal_pos_tags or (morph is not None and "Dual" in morph.get("Number", [])):
-    #     if debug:
-    #         print(f"{word} is {pos} which is not NOUN or ADJ; or is DUAL")
-    #     return word
+    if morph is not None and "Dual" in morph.get("Number"):
+        return word
 
     if debug:
-        print(f'odyCy on {word}: \n\tLemma {lemma}, \n\tPOS: {pos}, \n\tMorphology: {morph}')
+        logging.debug(f'odyCy on {word}: \n\tLemma {lemma}, \n\tPOS: {pos}, \n\tMorphology: {morph}')
 
     def first_declination(word, lemma, morph):
         '''
@@ -95,26 +96,26 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
             etacist_version = word[:-1] + "η"
             if any(etacist_version[:-1] == ionic_word[:-1] and etacist_version[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
                 if debug:
-                    print(f'\033[1;32m{word}: 1D case 1\033[0m')
+                    logging.debug(f'\033[1;32m{word}: 1D case 1\033[0m')
                 return word + "_"
 
         # -α_ν for 1D nouns in accusative singular feminine
         elif only_bases(word)[-2:] == "αν" and 'Acc' in morph.get("Case") and 'Sing' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             if debug:
-                print('pass 1')
+                logging.debug('pass 1')
             if lemma[-1] in ["η", "α"]:
                 etacist_lemma = lemma[:-1] + "η"
                 if debug:
-                    print(f'Etacist lemma: {etacist_lemma}')
+                    logging.debug(f'Etacist lemma: {etacist_lemma}')
                 if any(etacist_lemma[:-1] == ionic_word[:-1] and etacist_lemma[-1] == only_bases(ionic_word[-1]) for ionic_word in ionic):
                     if debug:
-                        print(f'\033[1;32m{word}: 1D case 2\033[0m')
+                        logging.debug(f'\033[1;32m{word}: 1D case 2\033[0m')
                     return word[:-1] + "_" + word[-1]
 
         # -α_ς for 1D nouns in genitive singular feminine
         elif only_bases(word)[-2:] == "ας" and 'Gen' in morph.get("Case") and 'Sing' in morph.get("Number") and 'Fem' in morph.get("Gender"):
             if debug:
-                print(f'\033[1;32m{word}: 1D case 3\033[0m')
+                logging.debug(f'\033[1;32m{word}: 1D case 3\033[0m')
             return word[:-1] + "_" + word[-1]
         
         # -α_ς for 1D nouns in accusative plural feminine
@@ -122,50 +123,61 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
             if pos in ["NOUN", "PROPN"]: # words with one gender
                 if lemma[-1] in ["η", "α"]:
                     if debug:
-                        print(f'\033[1;32m{word}: 1D case 4 for NOUN\033[0m')
+                        logging.debug(f'\033[1;32m{word}: 1D case 4 for NOUN\033[0m')
                     return word[:-1] + "_" + word[-1]
             elif pos in ["ADJ", "NUM", "PRON"]: # words whose lemma is probably in masculine
                 if debug:
-                    print(f'\033[1;32m{word}: 1D case 4 for ADJ\033[0m')
+                    logging.debug(f'\033[1;32m{word}: 1D case 4 for ADJ\033[0m')
                 return word[:-1] + "_" + word[-1]
         
         else:
-            return word
+            return None
     
     def masc_and_neutre_short_alpha(word, morph):
         if only_bases(word)[-1:] == "α" and ('Masc' in morph.get("Gender") or 'Neut' in morph.get("Gender")):
             if debug:
-                print(f'\033[1;32m{word}: Masc/Neut short alpha\033[0m')
+                logging.debug(f'\033[1;32m{word}: Masc/Neut short alpha\033[0m')
             return word + "^"
         
-        return word
+        return None
     
     def dative_short_iota(word, morph):
         '''
         Note optional ny ephelkystikon!
         '''
         if 'Dat' in morph.get("Case"):
-            if only_bases(word)[-1:] == "ι":
-                if debug:
-                    print(f'\033[1;32m{word}: Dat short iota\033[0m')
+            if only_bases(word)[-1] == "ι":
+                logging.debug(f'\033[1;32m{word}: Dat short iota\033[0m')
                 return word + "^"
             elif only_bases(word)[-2:] == "ιν":
-                if debug:
-                    print(f'\033[1;32m{word}: Dat short iota (with ny ephelkystikon)\033[0m')
-                return word[:-1] + "^" + word[-1]
-        return word
+                logging.debug(f'\033[1;32m{word}: Dat short iota (with ny ephelkystikon)\033[0m')
+                word = word[:-1] + "^" + word[-1]
+                return word
+        return None
     
     result = first_declination(word, lemma, morph)
     if result:
         return result
+    else:
+        logging.debug("No 1D!")
     
     result = masc_and_neutre_short_alpha(word, morph)
     if result:
         return result
+    else:
+        logging.debug("No short alpha!")
     
     result = dative_short_iota(word, morph)
     if result:
         return result
+    else:
+        logging.debug("No short alpha!")
+
+    result = macronize_nominal_stem_suffixes(word, lemma, pos, morph, debug=False)
+    if result:
+        return result
+    else:
+        logging.debug("No viable stem suffix!")
     
     return word
 
@@ -175,7 +187,7 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=False):
 #
 
 if __name__ == "__main__":
-    print("Running asserts for macronize_nominal_forms...")
+    logging.debug("Running asserts for macronize_nominal_forms...")
 
     import warnings
     import grc_odycy_joint_trf
@@ -226,12 +238,14 @@ if __name__ == "__main__":
         assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "καλά_ς"
 
         # (5) for all masculine and neutre nouns, the ending -α is short
-        output = nlp("ὁπλίτα")
+        output = nlp("λειμώνα")
         token = output[0]
         word = token.orth_
         lemma = token.lemma_
         pos = token.pos_
         morph = token.morph
+
+        # assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "λειμώνα^", logging.debug(output)
 
         #assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "ὁπλίτα^" 
 
@@ -243,7 +257,21 @@ if __name__ == "__main__":
         pos = token.pos_
         morph = token.morph
 
-        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "γυναιξί^"
+        if macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "γυναιξί^": 
+            logging.debug(f"Success! {output}")
+        else: 
+            logging.debug(f"Fail! {output}")
+
+        output = nlp("ὕδατι")
+        token = output[0]
+        word = token.orth_
+        lemma = token.lemma_
+        pos = token.pos_
+        morph = token.morph
+        if macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "ὕδατι^": 
+            logging.debug(output)
+        else:
+            logging.debug(f"Fail! {output}")
 
         output = nlp("γυναιξίν")
         token = output[0]
@@ -262,7 +290,8 @@ if __name__ == "__main__":
         pos = token.pos_
         morph = token.morph
 
-        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == None
+        assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "χεροῖν"
 
     except AssertionError:
-        print(f"Assertion failed for input: {input}")
+        logging.debug(f"Assertion failed for input: {input}")
+
