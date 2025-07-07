@@ -9,7 +9,7 @@ import re
 
 from tqdm import tqdm
 
-from grc_utils import ACCENTS, only_bases, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, patterns, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
+from grc_utils import ACCENTS, only_bases, CONSONANTS_LOWER_TO_UPPER, count_ambiguous_dichrona_in_open_syllables, count_dichrona_in_open_syllables, GRAVES, long_acute, lower_grc, no_macrons, normalize_word, paroxytone, patterns, proparoxytone, properispomenon, short_vowel, syllabifier, upper_grc, vowel, VOWELS_LOWER_TO_UPPER, word_with_real_dichrona
 
 from .ascii import ascii_macronizer
 from .barytone import replace_grave_with_acute, replace_acute_with_grave
@@ -118,6 +118,7 @@ class Macronizer:
             return macron_unicode_to_markup(word_recapitalized)
         elif word in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
             match = wiktionary_ambiguous_map[word]
+            print(match)
             disambiguated = morph_disambiguator(word, lemma, pos, morph, token=match[0], tense=match[1], case_voice=match[2], mode=match[3], person=match[4], number=match[5])
             return macron_unicode_to_markup(disambiguated)
         elif word_lower in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
@@ -182,6 +183,7 @@ class Macronizer:
         double_accent_recursion_results = []
         case_ending_recursion_results = []
         reversed_elision_recursion_results = []
+        decapitalization_results = []
             
         def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False, reversed_elision_pass=False):
             '''
@@ -643,7 +645,8 @@ class Macronizer:
             #         logging.debug(f'\t❌ Capitalization did not help')
 
             ### DECAPITALIZING RECURSION ### Useful because many editions capitalize the first word of a sentence or section!
-            if count_dichrona_in_open_syllables(macronized_token) > 0 and token[0] in VOWELS_LOWER_TO_UPPER.values():
+            if count_dichrona_in_open_syllables(macronized_token) > 0 and (token[0] in VOWELS_LOWER_TO_UPPER.values() or token[0] in CONSONANTS_LOWER_TO_UPPER.values()):
+                print("pass")
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
                 if not capitalized_pass and not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
@@ -656,6 +659,7 @@ class Macronizer:
                     macronized_token = merge_or_overwrite_markup(recapitalized_token, macronized_token)
 
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                        decapitalization_results.append(macronized_token)
                         if self.debug:
                             logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     elif self.debug:
