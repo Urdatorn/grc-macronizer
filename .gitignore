@@ -20,6 +20,8 @@ src/grc_macronizer.egg-info
 # behind-the-scenes stuff
 scripts/dev
 scripts/test*
+scripts/*log*
+scripts/norma_output.tsv
 notebooks/sandbox.ipynb
 src/grc_macronizer/test*.py
 

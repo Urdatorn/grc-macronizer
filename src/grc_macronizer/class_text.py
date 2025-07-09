@@ -12,7 +12,6 @@ from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES,
 
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
-from .nominal_forms import macronize_nominal_forms
 
 warnings.filterwarnings('ignore', category=FutureWarning)
     

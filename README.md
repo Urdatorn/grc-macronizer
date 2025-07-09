@@ -1,6 +1,6 @@
 # A Macronizer for Ancient Greek
 
-![cast](docs/media/macronizer.gif)
+<img src="docs/media/macronizer.gif" width="300">
 
 A macronizer geared towards batch macronizing corpora with machine-friendly markup, avoiding combining diacritics and everything that doesn't render in standard IDE and terminal fonts unless specifically asked for.
 
@@ -13,3 +13,7 @@ A macronizer geared towards batch macronizing corpora with machine-friendly mark
 And that's it! Start macronizing by running the notebook [here](macronize.ipynb).
 
 If you have a plain text file you want to macronize, you can run it with `python main.py input_file output_file`.
+
+Note that if you have a newer spaCy pipeline for Ancient Greek, it is easy to substitute it for odyCy. Indeed, the rest of the software has no legacy dependencies and should run with the latest python. 
+
+# License

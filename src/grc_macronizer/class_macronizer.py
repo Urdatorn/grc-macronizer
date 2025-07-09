@@ -90,8 +90,7 @@ class Macronizer:
                  debug=False,
                  doc_from_file=True,
                  no_hypotactic=False,
-                 custom_doc="",
-                 conllu_file_path=""):
+                 custom_doc=""):
 
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
@@ -100,7 +99,6 @@ class Macronizer:
         self.doc_from_file = doc_from_file
         self.no_hypotactic = no_hypotactic
         self.custom_doc = custom_doc
-        self.conllu_file_path = conllu_file_path
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -167,7 +165,7 @@ class Macronizer:
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
-        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc, conllu_file_path=self.conllu_file_path)
+        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of module efficacy
@@ -646,14 +644,13 @@ class Macronizer:
 
             ### DECAPITALIZING RECURSION ### Useful because many editions capitalize the first word of a sentence or section!
             if count_dichrona_in_open_syllables(macronized_token) > 0 and (token[0] in VOWELS_LOWER_TO_UPPER.values() or token[0] in CONSONANTS_LOWER_TO_UPPER.values()):
-                print("pass")
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
-                if not capitalized_pass and not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
+                if not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
                     if self.debug:
                         logging.debug(f'\t Decapitalizing {macronized_token} as {decapitalized_token}')
                     
-                    decapitalized_token = macronization_modules(decapitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass,  decapitalized_pass=True, is_lemma=is_lemma)
+                    decapitalized_token = macronization_modules(decapitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass,  decapitalized_pass=True, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=reversed_elision_pass)
                     recapitalized_token = token[0] + decapitalized_token[1:] # restore the original first character
 
                     macronized_token = merge_or_overwrite_markup(recapitalized_token, macronized_token)
@@ -690,7 +687,7 @@ class Macronizer:
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
             if count_dichrona_in_open_syllables(result) > 0:
-                still_ambiguous.append(result)
+                still_ambiguous.append((result, lemma, pos, morph))
             macronized_tokens.append(result)
 
         logging.info(f'\n\n### END OF MACRONIZATION ###\n\n')
@@ -699,7 +696,7 @@ class Macronizer:
         text_object.integrate() # creates the final .macronized_text
 
         if self.make_prints:
-            self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
+            the_ratio = self.macronization_ratio(text, text_object.macronized_text, count_all_dichrona=True, count_proper_names=True)
         
         # MODULE EFFICACY LISTS
 
@@ -716,6 +713,7 @@ class Macronizer:
             "double_accent_recursion_results": double_accent_recursion_results,
             "case_ending_recursion_results": case_ending_recursion_results,
             "reversed_elision_recursion_results": reversed_elision_recursion_results,
+            "decapitalization_results": decapitalization_results,
         }
 
         module_dir = Path("diagnostics") / "modules"
@@ -723,7 +721,9 @@ class Macronizer:
 
         for name, result_list in results_dict.items():
             logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
-            out_path = module_dir / f"{name}.txt"
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_path = module_dir / f"{timestamp}_{name}.txt"
             with out_path.open("w", encoding="utf-8") as f:
                 for word in result_list:
                     f.write(f"{word}\n")
@@ -731,13 +731,19 @@ class Macronizer:
         # STILL_AMBIGUOUS
 
         def sort_by_occurrences(lst):
-            count = Counter(lst)  # Count occurrences
-            sorted_lst = sorted(lst, key=lambda x: (-count[x], x))  # Sort by frequency (desc), then by value (asc)
+            count = Counter(x[0] for x in lst)
+            sorted_lst = sorted(lst, key=lambda x: (-count[x[0]], x[0]))  # Sort by frequency (desc), then by value (asc)
             return sorted_lst, count  # Return sorted list + count dictionary
 
-        # Assuming still_ambiguous is a list of some kind
         sorted_list, counts = sort_by_occurrences(still_ambiguous)  # Preserve order
-        unique_sorted_list = list(dict.fromkeys(sorted_list))  # Remove duplicates while keeping order
+        # Remove duplicates while preserving order (based on first element of quadruple)
+        seen = set()
+        unique_sorted_list = []
+        for item in sorted_list:
+            key = item[0]
+            if key not in seen:
+                seen.add(key)
+                unique_sorted_list.append(item)
 
         file_version = 1
         file_stub = ''
@@ -753,16 +759,15 @@ class Macronizer:
                 file_stub = still_ambiguous_dir / 'still_ambiguous'
 
             while True:
-                file_name = file_stub.with_name(f'{file_stub.stem}_{file_version}.py')  # Handle file naming with versioning
-                if not file_name.exists():  # Check if the file exists using Path's .exists()
+                file_name = file_stub.with_name(f'{file_stub.stem}_{file_version}.tsv')  # Output TSV now
+                if not file_name.exists():
                     break
                 file_version += 1
 
-            with file_name.open('w', encoding='utf-8') as f:  # Use Path's .open() method
-                f.write('still_ambiguous = [\n')
-                for item in unique_sorted_list:  # Use unique sorted list to maintain order
-                    f.write(f'    {repr(item)},  # {counts[item]} occurrences\n')
-                f.write(']\n')
+            with file_name.open('w', encoding='utf-8') as f:
+                for item in unique_sorted_list:
+                    count = counts[item[0]]
+                    f.write(f"{count}\t{item[0]}\t{item[1]}\t{item[2]}\t{item[3]}\n")
 
         return text_object.macronized_text
     
@@ -868,7 +873,5 @@ class Macronizer:
     
     def lemma_generalization(self, macronized_token, lemma):
         """
-        Take a deep breath and focus. 
-        This is probably the one module with the greatest potential for optimization, given enough ingenuity.
         """
         return macronized_token

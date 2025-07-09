@@ -6,7 +6,9 @@ from grc_utils import colour_dichrona_in_open_syllables
 
 macronizer = Macronizer(make_prints=False, doc_from_file=False)
 
-input = "Χρὴ γινώσκειν ὅτι πάσης τῆς γῆς ὁ περίμετρος."
+input = "εἰ ἂν λύῃς τὸν δοῦλον"
+input = "ἂν λύῃς τὸν δοῦλον λιτός"
+input = "Πάνυ"
 
 time_start = time.time()
 output = macronizer.macronize(input)
