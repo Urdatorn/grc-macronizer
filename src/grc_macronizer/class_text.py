@@ -8,15 +8,20 @@ import grc_odycy_joint_trf
 from spacy.tokens import DocBin
 import xxhash
 
-from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, normalize_word, ROUGHS, syllabifier
+from grc_utils import ACCENTS, ACUTES, count_dichrona_in_open_syllables, GRAVES, is_greek_numeral, lower_grc, normalize_word, ROUGHS, syllabifier
 
 from .stop_list import stop_list
 from .stop_list_epic import epic_stop_words
 
 warnings.filterwarnings('ignore', category=FutureWarning)
-    
+
+greek_ano_teleia = "\u0387"
+greek_question_mark = "\u037e"
+middle_dot = "\u00b7"
+apostrophes = "'’‘´΄\u02bc͵" # the last one is for thousands
+
 def word_list(text):
-    greek_punctuation = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>\-—…]' # NOTE hyphens must be escaped (AI usually misses this)
+    greek_punctuation = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>«»\-—…|⏑⏓†×]' # NOTE hyphens must be escaped (AI usually misses this)
     
     cleaned_text = re.sub(greek_punctuation, ' ', text)
 
@@ -39,18 +44,33 @@ class Text:
     NB: The user shouldn't have to deal with this class; it is to be used *internally* by the interfacing Macronizer class.
     '''
 
-    def __init__(self, text, genre='prose', doc_from_file=True, custom_doc="", debug=False):
+    def __init__(self, text, genre='prose', doc_from_file=True, custom_doc="", debug=False, lowercase=False):
         
         # -- Prepare the text for odyCy --
 
-        to_remove = {'^', '_', '-', '<', '>', '[', ']', '«', '»', '†'} # 6/4 added dash because of buggy corpora with broken-up words
-        translation_table = str.maketrans("", "", "".join(to_remove))
+        ### Clean non-Greek characters and punctuation
+
+        chars_to_clean = r'[^_()\[\]{}<>\"«»\-—…|⏑⏓†×]' # pipes actually appear in OGA
 
         before_odycy = text
-        before_odycy = before_odycy.translate(translation_table)
-        before_odycy = before_odycy.replace('’', "'") # Normalizing elisions. odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
+        before_odycy = re.sub(chars_to_clean, '', before_odycy)
+
+        ### Normalize
+
+        before_odycy = normalize_word(before_odycy)
+
+        ### Lower the case
+
+        if lowercase:
+            before_odycy = lower_grc(before_odycy)
+
+        ### Normalize elisions
+
+        before_odycy = before_odycy.replace('’', "'") # odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
         before_odycy = before_odycy.replace('‘', "'")
         before_odycy = before_odycy.replace('\u02bc', "'") # "Modifier letter apostrophe"
+        before_odycy = before_odycy.replace('´', "'") # "Acute accent"
+        before_odycy = before_odycy.replace('΄', "'") # "Greek tonos"
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
 
@@ -139,20 +159,30 @@ class Text:
                 if token.text and token.pos_: # NOTE: .morph is empty for some tokens, such as prepositions like ἀπό, whence it is imperative not to filter out empty morphs. Some words have empty lemma too.
                     orth = token.text.replace('\u0387', '').replace('\u037e', '') # remove ano teleia and Greek question mark
                     logging.debug(f"\t'Token text: {orth}")
-                    if 'ς' in list(orth[:-1]):
-                        logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
-                        buggy_words_in_input += 1
+                    
+                    # MAJOR FILTER FOR TOKENS NOT TO MACRONIZE
+
+                    # 1 Numerals
+                    if is_greek_numeral(orth):
+                        logging.debug(f"\033Word '{orth}' is a Greek numeral. Skipping with 'continue'.")
                         continue
-                    # MAJOR FILTER FOR BUGGY CORPUS
-                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or sum(char in ACCENTS for char in orth) > 2 or sum(char in ROUGHS for char in orth) > 2:
-                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave or more than two accents or more than one spiritus. Skipping with 'continue'.")
-                        buggy_words_in_input += 1
-                        continue
+
+                    # 2 Stop words
                     if orth in stop_list:
                         logging.info(f"\033General stop word '{orth}' found. Skipping with 'continue'.")
                         continue
                     if genre == 'epic' and orth in epic_stop_words:
                         logging.info(f"\033Epic stop word '{orth}' found. Skipping with 'continue'.")
+                        continue
+                    
+                    # 3 Formatting/OCR errors
+                    if 'ς' in list(orth[:-1]):
+                        logging.debug(f"\033Word '{orth}' contains a final sigma mid-word. Skipping with 'continue'.")
+                        buggy_words_in_input += 1
+                        continue
+                    if sum(char in GRAVES for char in orth) > 1 or (any(char in GRAVES for char in orth) and any(char in ACUTES for char in orth)) or sum(char in ACCENTS for char in orth) > 2 or sum(char in ROUGHS for char in orth) > 2:
+                        logging.debug(f"Pathological word '{orth}' contains more than one grave accent or both acute and grave or more than two accents or more than one spiritus. Skipping with 'continue'.")
+                        buggy_words_in_input += 1
                         continue
                     if orth not in diagnostic_word_list and orth != 'ἂν' and orth != 'ἄν':
                         fail_counter += 1
