@@ -22,9 +22,12 @@ from .db.wiktionary_singletons import wiktionary_singletons_map
 from .format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
 from .morph_disambiguator import morph_disambiguator
 from .nominal_forms import macronize_nominal_forms
+from .sanity_check import demacronize_diphthong, macronized_diphthong
 from .verbal_forms import macronize_verbal_forms
 
-# --- Preamble ---
+####################
+# --- Preamble --- #
+####################
 
 # Logging setup
 
@@ -44,7 +47,9 @@ logging.info("Starting new log...")
 for line in ascii_macronizer:
     logging.info(line)
 
-# Load pickled data
+###########################
+# Load pickled databases  #
+###########################
 
 lsj_keys_path = files("grc_macronizer.db").joinpath("lsj_keys.pkl")
 with lsj_keys_path.open("rb") as f:
@@ -57,30 +62,9 @@ hypotactic_path = files("grc_macronizer.db").joinpath("hypotactic.pkl")
 with hypotactic_path.open("rb") as f:
     hypotactic = pickle.load(f)
 
-# Function to detect accidentally macronized diphthongs
-
-diphth_i = patterns['diphth_i']
-diphth_y = patterns['diphth_y']
-adscr_i = patterns['adscr_i']
-
-combined_pattern = re.compile(f'(?:{diphth_y}|{diphth_i}|{adscr_i})[_^]')
-
-def macronized_diphthong(word: str) -> bool:
-    '''
-    Part of the sanity check. 
-    >>> macronized_diphthong("χίλι^οι)
-    False
-    >>> macronized_diphthong("χίλιοι^")
-    True
-    '''
-    syllable_list = syllabifier(word)
-
-    for syllable in syllable_list:
-        if bool(re.search(combined_pattern, syllable)):
-            return True
-    return False
-
-# --- Main class ---
+#######################
+# --- Main class ---  #
+#######################
 
 class Macronizer:
     def __init__(self, 
@@ -90,7 +74,8 @@ class Macronizer:
                  debug=False,
                  doc_from_file=True,
                  no_hypotactic=False,
-                 custom_doc=""):
+                 custom_doc="",
+                 lowercase=False):
 
         self.macronize_everything = macronize_everything
         self.make_prints = make_prints
@@ -99,6 +84,7 @@ class Macronizer:
         self.doc_from_file = doc_from_file
         self.no_hypotactic = no_hypotactic
         self.custom_doc = custom_doc
+        self.lowercase = lowercase
             
     def wiktionary(self, word, lemma, pos, morph):
         """
@@ -141,11 +127,7 @@ class Macronizer:
         macronized = hypotactic.get(word)
         
         if macronized:
-            syllable_list = syllabifier(macronized)
-            for i, syllable in enumerate(syllable_list):
-                if bool(re.search(combined_pattern, syllable)):
-                    syllable_list[i] = syllable.replace('^', '').replace('_', '') # demacronize diphthongs
-            macronized = "".join(syllable_list)
+            macronized = demacronize_diphthong(macronized)
 
         return macronized
 
@@ -165,7 +147,7 @@ class Macronizer:
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
-        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc)
+        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc, lowercase=self.lowercase)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of module efficacy
@@ -502,7 +484,7 @@ class Macronizer:
                     logging.debug(f'\t❌ Reversed elision with iota macronization did not help either')
 
             ### WRONG-CASE-ENDING RECURSION ### 
-             
+
             '''
             e.g. πόλιν should go through πόλις
             '''
@@ -626,23 +608,10 @@ class Macronizer:
                     logging.debug(f'FOUND A Διὰ: {macronized_token}, {token} {lemma}, {pos}, {morph}')
                 return macronized_token
 
-            ### CAPITALIZING RECURSION ###
-            # if not capitalized_pass and not decapitalized_pass and pos == "PROPN" and macronized_token[0] in VOWELS_LOWER_TO_UPPER.keys():
-            #     capitalized_token = upper_grc(macronized_token[0]) + macronized_token[1:]
-            #     if self.debug:
-            #         logging.debug(f'\t \033Capitalizing {macronized_token} as {capitalized_token}')
-            #     old_macronized_token = macronized_token
-            #     capitalized_token = macronization_modules(capitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=True, decapitalized_pass=decapitalized_pass, is_lemma=is_lemma)
-            #     restored_token = old_macronized_token[0] + capitalized_token[1:] # restore the original first character
-            #     logging.debug(f'\t Restoring capitalized token: {capitalized_token} => {restored_token}')
-
-            #     macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
-            #     if self.debug and count_dichrona_in_open_syllables(macronized_token) != count_dichrona_in_open_syllables(old_macronized_token):
-            #         logging.debug(f'\t✅ Capitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-            #     else:
-            #         logging.debug(f'\t❌ Capitalization did not help')
-
-            ### DECAPITALIZING RECURSION ### Useful because many editions capitalize the first word of a sentence or section!
+            ### DECAPITALIZING RECURSION ###
+            
+            '''Useful because many editions capitalize the first word of a sentence or section! '''
+            
             if count_dichrona_in_open_syllables(macronized_token) > 0 and (token[0] in VOWELS_LOWER_TO_UPPER.values() or token[0] in CONSONANTS_LOWER_TO_UPPER.values()):
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
@@ -661,23 +630,17 @@ class Macronizer:
                             logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     elif self.debug:
                         logging.debug(f'\t❌ Decapitalization did not help')
-
-            # ### LEMMA-BASED GENERALIZATION RECURSION ###
-            # if count_dichrona_in_open_syllables(macronized_token) > 0:
-            #     decapitalized_token = lower_grc(token.replace('^', ''))
-            #     if not is_lemma and not decapitalized_token == lemma: # if the token is capitalized and is the lemma itself, we get infinite recursion
-            #         lemma_token = macronization_modules(macronized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, is_lemma=True)
-            #         macronized_token = self.lemma_generalization(macronized_token, lemma_token)
-            #         if self.debug:
-            #             logging.debug(f'\t✅ Lemma generalization (placeholder): {count_dichrona_in_open_syllables(macronized_token)} left')
+    
+            ################
+            # SANITY CHECK #
+            ################
 
             macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
             token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
-            assert macronized_normalized_for_checking == token_normalized_for_checking, f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace('^', '').replace('_', '')}"
-            
-            # SANITY CHECK 
-            if macronized_diphthong(macronized_token):
-                return token
+            if macronized_normalized_for_checking != token_normalized_for_checking: 
+                logging.DEBUG(f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace('^', '').replace('_', '')}")
+
+            macronized_token = demacronize_diphthong(macronized_token)
 
             return macronized_token
 
@@ -870,8 +833,3 @@ class Macronizer:
             logging.debug(f"apply_accentuation_rules just macronized a diphthong, so we returned the old version: {merged}")
             return old_version
         return merged
-    
-    def lemma_generalization(self, macronized_token, lemma):
-        """
-        """
-        return macronized_token

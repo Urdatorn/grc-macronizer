@@ -22,6 +22,15 @@ from grc_macronizer import Macronizer
 from grc_utils import count_dichrona_in_open_syllables, lower_grc, vowel
 
 #########################
+### Settings          ###
+#########################
+
+CHUNK_SIZE = 2000
+make_prints = False
+no_hypotactic = False
+lowercase = True
+
+#########################
 ### Utility functions ###
 #########################
 
@@ -57,14 +66,6 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 #########################
-### Settings          ###
-#########################
-
-CHUNK_SIZE = 2000
-make_prints = False
-no_hypotactic = True
-
-#########################
 ### CLI arguments     ###
 #########################
 
@@ -82,7 +83,7 @@ batch_nr = args.input_file.split('_')[-1].split('.')[0]
 
 signal.signal(signal.SIGINT, signal_handler)
 
-macronizer = Macronizer(make_prints=make_prints, doc_from_file=False, no_hypotactic=no_hypotactic)
+macronizer = Macronizer(make_prints=make_prints, doc_from_file=False, no_hypotactic=no_hypotactic, lowercase=lowercase)
 
 print(f"###########################################")
 print(f"### Macronizing OGA batch {batch_nr}... ###")
