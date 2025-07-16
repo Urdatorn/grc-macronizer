@@ -216,6 +216,8 @@ class Macronizer:
 
             ### DB MODULES ####
 
+            # WIKTIONARY
+
             old_macronized_token = macronized_token
             wiktionary_token = self.wiktionary(macronized_token, lemma, pos, morph)
             macronized_token = merge_or_overwrite_markup(wiktionary_token, macronized_token)
@@ -228,28 +230,7 @@ class Macronizer:
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 return macronized_token
 
-            old_macronized_token = macronized_token
-            hypotactic_token = self.hypotactic(macronized_token)
-            macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
-            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
-                hypotactic_results.append(macronized_token)
-                logging.debug(f'\t✅ Hypotactic helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
-            else:
-                logging.debug(f'\t❌ Hypotactic did not help')
-
-            # ΕΧTRA ACCENT RULE INSTANCE FOR CORRECTION 
-            # NOTE: I found a bug (θύ^ελλα_ν) in hypotactic, whence by commenting out the below I make it possible for it to be overwritten and corrected by accent rules etc.
-            # if count_dichrona_in_open_syllables(macronized_token) == 0:
-            #     return macronized_token
-
-            old_macronized_token = macronized_token
-            accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
-            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
-            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
-                accent_rules_results.append(macronized_token)
-                logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
-            else:
-                logging.debug(f'\t❌ Accent rules did not help')
+            # LSJ
             
             old_macronized_token = macronized_token
             lsj_token = lsj.get(token, token)
@@ -611,7 +592,7 @@ class Macronizer:
             ### DECAPITALIZING RECURSION ###
             
             '''Useful because many editions capitalize the first word of a sentence or section! '''
-            
+
             if count_dichrona_in_open_syllables(macronized_token) > 0 and (token[0] in VOWELS_LOWER_TO_UPPER.values() or token[0] in CONSONANTS_LOWER_TO_UPPER.values()):
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
@@ -630,6 +611,37 @@ class Macronizer:
                             logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     elif self.debug:
                         logging.debug(f'\t❌ Decapitalization did not help')
+
+            ###############################
+            # HYPOTACTIC (SPECIAL SAFETY) #
+            ###############################
+
+            '''
+            Hypotactic is the wildest of the databases, because it is culled directly from verse. 
+            To minimize bugs, the safety-net idea here is 
+                1) that hypotactic is last in priority and 
+                2) that bugs like θύ^ελλα_ν should be allowed to be corrected by the extra final accent rule call.
+            '''
+
+            old_macronized_token = macronized_token
+            hypotactic_token = self.hypotactic(macronized_token)
+            macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                hypotactic_results.append(macronized_token)
+                logging.debug(f'\t✅ Hypotactic helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Hypotactic did not help')
+
+            old_macronized_token = macronized_token
+            accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
+            print(accent_rules_token)
+            macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
+            print(macronized_token)
+            if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                accent_rules_results.append(macronized_token)
+                logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+            else:
+                logging.debug(f'\t❌ Accent rules did not help')
     
             ################
             # SANITY CHECK #
@@ -807,25 +819,25 @@ class Macronizer:
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1): # NB: len(syllable)-1 is the index of the last character (0-indexed); -1 is to go backwards
                     if vowel(syllable[i]) and word_with_real_dichrona(syllable):
-                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
+                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:].replace("^", "").replace("_", "")
                         break
             elif position == -1 and paroxytone(new_version) and long_acute(penultima):
                 # Find the last vowel in syllable and append '_' after it
                 for i in range(len(syllable)-1, -1, -1):
                     if vowel(syllable[i]) and word_with_real_dichrona(syllable):
-                        modified_syllable = syllable[:i+1] + '_' + syllable[i+1:]
+                        modified_syllable = syllable[:i+1] + '_' + syllable[i+1:].replace("^", "").replace("_", "")
                         break
             elif position == -1 and (properispomenon(new_version) or proparoxytone(new_version)):
                 # Find the last vowel in syllable and append '^' after it
                 for i in range(len(syllable)-1, -1, -1):
                     if vowel(syllable[i]) and word_with_real_dichrona(syllable):
-                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:]
+                        modified_syllable = syllable[:i+1] + '^' + syllable[i+1:].replace("^", "").replace("_", "")
                         break
             modified_syllable_positions.append((position, modified_syllable))
             
         #print("Modified syllable positions:", modified_syllable_positions) # new debug print
         new_version = ''.join(syllable for _, syllable in modified_syllable_positions)
-        #print("New version:", new_version) # debugging
+        print("New version:", new_version) # debugging
 
         merged = merge_or_overwrite_markup(new_version, old_version)
 

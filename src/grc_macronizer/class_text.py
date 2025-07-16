@@ -50,7 +50,7 @@ class Text:
 
         ### Clean non-Greek characters and punctuation
 
-        chars_to_clean = r'[^_()\[\]{}<>\"«»\-—…|⏑⏓†×]' # pipes actually appear in OGA
+        chars_to_clean = r'[\^_()\[\]{}<>\"«»\-—…|⏑⏓†×]' # pipes actually appear in OGA
 
         before_odycy = text
         before_odycy = re.sub(chars_to_clean, '', before_odycy)
@@ -102,7 +102,10 @@ class Text:
         odycy_docs_dir = project_root / "odycy_docs"
         odycy_docs_dir.mkdir(parents=True, exist_ok=True)
 
-        if len(sentence_list[0].split()) > 1:
+        # Handle empty sentence_list case
+        if not sentence_list:
+            filename = f"empty-text-{hash_value}.spacy"
+        elif len(sentence_list[0].split()) > 1:
             filename = f"{'-'.join(sentence_list[0].split()[i] for i in (0, 1))}-{hash_value}.spacy"
         else:
             filename = f"{sentence_list[0].split()[0]}-{hash_value}.spacy"
@@ -120,12 +123,15 @@ class Text:
             docs = list(doc_bin.get_docs(nlp.vocab))
         else:
             nlp = grc_odycy_joint_trf.load()
-            docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
-            doc_bin = DocBin()
-            for doc in docs:
-                doc_bin.add(doc)
-            logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
-            doc_bin.to_disk(output_file_name)
+            if sentence_list:  # Only process if we have sentences
+                docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
+                doc_bin = DocBin()
+                for doc in docs:
+                    doc_bin.add(doc)
+                logging.info(f"Saving odyCy doc bin to disc as {output_file_name}")
+                doc_bin.to_disk(output_file_name)
+            else:
+                docs = []  # Empty docs list for empty input
         
         #
         # -- Preparing the master list of words to be macronized (and handling ἄν) -- (NOTE often THE key step in analyzing nonplussing bugs)

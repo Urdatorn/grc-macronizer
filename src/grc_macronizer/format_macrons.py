@@ -232,4 +232,8 @@ def merge_or_overwrite_markup(new_version, old_version, precedence='new'):
             
     return ''.join(result)
 
-assert merge_or_overwrite_markup('st_ring^', 's_t^ring^') == 's_t_ring^'
+if __name__ == '__main__':
+
+    assert merge_or_overwrite_markup('st_ring^', 's_t^ring^') == 's_t_ring^'
+
+    print(merge_or_overwrite_markup("θύελλα^ν", "θύελλα_ν"))

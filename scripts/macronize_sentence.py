@@ -8,7 +8,7 @@ macronizer = Macronizer(make_prints=False, doc_from_file=False)
 
 input = "εἰ ἂν λύῃς τὸν δοῦλον"
 input = "ἂν λύῃς τὸν δοῦλον λιτός"
-input = "Πάνυ"
+input = "θύελλαν"
 
 time_start = time.time()
 output = macronizer.macronize(input)
