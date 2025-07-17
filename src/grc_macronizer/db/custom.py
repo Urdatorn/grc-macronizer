@@ -1,3 +1,5 @@
+from grc_utils import normalize_word, lower_grc, upper_grc
+
 custom_macron_map = {
     # Articles
     "ἁ": "ἁ_", # doric ἡ
@@ -620,7 +622,20 @@ custom_macron_map = {
 
 def custom_macronizer(word):
     word = word.replace('^', '').replace('_', '')
+    word = normalize_word(word)
+
     if word in custom_macron_map:
         return custom_macron_map[word]
+
+    for key in custom_macron_map:
+
+        if lower_grc(key) == word:
+            return lower_grc(custom_macron_map[key])
+        
+        capitalized_key = upper_grc(key[0]) + key[1:] 
+        capitalized_value = upper_grc(custom_macron_map[key][0]) + custom_macron_map[key][1:]
+
+        if capitalized_key == word:
+            return capitalized_value
     
     return word

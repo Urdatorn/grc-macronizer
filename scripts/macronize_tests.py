@@ -21,7 +21,7 @@ from grc_macronizer.tests.anabasis import anabasis, anabasis_medium, anabasis_sh
 
 from grc_utils import colour_dichrona_in_open_syllables, macronization_stats
 
-macronizer = Macronizer(no_hypotactic=True, make_prints=True)
+macronizer = Macronizer(no_hypotactic=True, make_prints=True, lowercase=True)
 
 #input = hiketides
 #input = anabasis_short

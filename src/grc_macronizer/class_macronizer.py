@@ -102,7 +102,7 @@ class Macronizer:
             return macron_unicode_to_markup(word_recapitalized)
         elif word in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
             match = wiktionary_ambiguous_map[word]
-            print(match)
+            #print(match)
             disambiguated = morph_disambiguator(word, lemma, pos, morph, token=match[0], tense=match[1], case_voice=match[2], mode=match[3], person=match[4], number=match[5])
             return macron_unicode_to_markup(disambiguated)
         elif word_lower in wiktionary_ambiguous_map: # format: [[unnormalized tokens with macrons], [table names], [row headers 1], row headers 2], [column header 1], [column header 2]]
@@ -133,17 +133,23 @@ class Macronizer:
 
     def macronize(self, text, genre='prose'):
         """
-        Macronization is a modular and recursive process comprised of the following operations, 
-        where later entries are considered more reliable and thus overwrite earlier ones in case of disagreement:
+        Macronization is a modular and recursive process comprised of the following operations:
+            
+            [custom]
+
             [wiktionary]
-            [hypotactic]
             [lsj]
-            [nominal forms] # needs to be moved here from Text
+
+            [nominal forms]
             [verbal forms]
             [accent rules]
-            [lemma-based generalization]
-            [custom] # finally, hardcode whatever macronizations you want to overwrite every other module
-        Accent rules and (naturally) lemma-based generalization are the only modules that rely on the output of the other modules for optimal performance.
+
+            [recursive algorithms]
+
+            [hypotactic]
+
+        Accent rules relies on the output of the other modules for optimal performance.
+        Hypotactic has special safety measures in place; refer to it's docstring below. 
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
@@ -202,7 +208,7 @@ class Macronizer:
                 else:
                     logging.debug(f'\t✅ Macronized neutre {token}')
                     return 'ἄλλα^' # neutre plural
-
+            
             custom_token = custom_macronizer(macronized_token)
             if self.debug and custom_token != macronized_token:
                 logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
@@ -635,9 +641,8 @@ class Macronizer:
 
             old_macronized_token = macronized_token
             accent_rules_token = self.apply_accentuation_rules(macronized_token) # accent rules benefit from earlier macronization
-            print(accent_rules_token)
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
-            print(macronized_token)
+
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 accent_rules_results.append(macronized_token)
                 logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -836,9 +841,7 @@ class Macronizer:
                         break
             modified_syllable_positions.append((position, modified_syllable))
             
-        #print("Modified syllable positions:", modified_syllable_positions) # new debug print
         new_version = ''.join(syllable for _, syllable in modified_syllable_positions)
-        print("New version:", new_version) # debugging
 
         merged = merge_or_overwrite_markup(new_version, old_version)
 

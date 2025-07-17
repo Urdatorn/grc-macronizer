@@ -25,9 +25,9 @@ from grc_utils import count_dichrona_in_open_syllables, lower_grc, vowel
 ### Settings          ###
 #########################
 
-CHUNK_SIZE = 2000
+CHUNK_SIZE = 1000
 make_prints = False
-no_hypotactic = False
+no_hypotactic = True # Now trying with Hypotactic again
 lowercase = True
 
 #########################
