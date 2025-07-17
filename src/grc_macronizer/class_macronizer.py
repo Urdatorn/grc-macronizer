@@ -618,14 +618,15 @@ class Macronizer:
 
             '''
             Hypotactic is the wildest of the databases, because it is culled directly from verse. 
-            To minimize bugs, the safety-net idea here is 
-                1) that hypotactic is last in priority and 
-                2) that bugs like θύ^ελλα_ν should be allowed to be corrected by the extra final accent rule call.
+            To minimize bugs, the safety-net idea here is that
+                1) hypotactic is the last module so that fully macronized tokens will not reach it,
+                2) the merge is done with precedence='old' so that hypotactic does not overwrite any previous macronization, 
+                3) bugs like θύ^ελλα_ν should be allowed to be corrected by an extra final accent-rule call.
             '''
 
             old_macronized_token = macronized_token
             hypotactic_token = self.hypotactic(macronized_token)
-            macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token)
+            macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token, precedence='old')
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 hypotactic_results.append(macronized_token)
                 logging.debug(f'\t✅ Hypotactic helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
@@ -650,7 +651,7 @@ class Macronizer:
             macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
             token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
             if macronized_normalized_for_checking != token_normalized_for_checking: 
-                logging.DEBUG(f"Watch out! We just accidentally perverted a token: {token} has become {macronized_token.replace('^', '').replace('_', '')}")
+                logging.DEBUG(f"Watch out! We just accidentally perverted a token: {token_normalized_for_checking} has become {macronized_normalized_for_checking}")
 
             macronized_token = demacronize_diphthong(macronized_token)
 

@@ -1,7 +1,6 @@
 '''
-Here we define what the output should never be, withot exception:
+Here we define what the output should never be, without exception:
 - Diphthongs should never be macronized.
-- Closed syllables should not have macrons.
 '''
 
 import re
@@ -47,9 +46,6 @@ def macronized_diphthong(word: str) -> bool:
     return False
 
 def demacronize_diphthong(word: str) -> str:
-    '''
-    Demacronizes diphthongs in a word.
-    '''
     syllable_list = syllabifier(word)
     
     for idx, syllable in enumerate(syllable_list):
@@ -58,9 +54,6 @@ def demacronize_diphthong(word: str) -> str:
             syllable_list[idx] = syllable
 
     return ''.join(syllable_list)
-
-def macronized_closed_syllable():
-    pass
 
 if __name__ == "__main__":
     print(macronized_diphthong("χίλιοι^"))  # Should return True
