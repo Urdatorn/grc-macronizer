@@ -67,10 +67,11 @@ class Text:
         ### Normalize elisions
 
         before_odycy = before_odycy.replace('’', "'") # odyCy only understands apostrophe \u0027. Right single quote \u2019 => apostrophe \u0027
-        before_odycy = before_odycy.replace('‘', "'")
-        before_odycy = before_odycy.replace('\u02bc', "'") # "Modifier letter apostrophe"
+        before_odycy = before_odycy.replace('‘', "'") # "Left single quotation mark"
+        before_odycy = before_odycy.replace('\u02bc', "'") # "Modifier letter apostrophe" (ʼ)
         before_odycy = before_odycy.replace('´', "'") # "Acute accent"
         before_odycy = before_odycy.replace('΄', "'") # "Greek tonos"
+        before_odycy = before_odycy.replace('᾿', "'") # "Greek psili", absurdly used a ton for elision in OGA, e.g. "λέγει παρ᾿ ἱστορίαν", probably an OCR error (psili should never occur alone, it is a diacritic)
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
 
