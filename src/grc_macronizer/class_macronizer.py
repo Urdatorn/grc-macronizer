@@ -133,20 +133,26 @@ class Macronizer:
 
     def macronize(self, text, genre='prose'):
         """
-        Macronization is a modular and recursive process comprised of the following operations:
+        Macronization is a modular and recursive process comprised of the following 13 steps, 
+        with the high-trust db modules first, then the algorithmic modules, the recursive ones and finally the hypotactic db module:
             
             [custom]
-
             [wiktionary]
             [lsj]
 
             [nominal forms]
             [verbal forms]
             [accent rules]
+            [prefixes]
 
-            [recursive algorithms]
+            [double-accent recursion]
+            [reversed-elision recursion]
+            [wrong-case recursion]
+            [oxytonizing recursion]
+            [decapitalization recursion]
 
             [hypotactic]
+            [accent rules] (re-applied in overwrite mode as a sanity check)
 
         Accent rules relies on the output of the other modules for optimal performance.
         Hypotactic has special safety measures in place; refer to it's docstring below. 
@@ -156,20 +162,24 @@ class Macronizer:
         text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc, lowercase=self.lowercase)
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
-        # lists to keep track of module efficacy
+        # lists to keep track of the modules' efficacy
+        
+        custom_results = []
         wiktionary_results = []
-        hypotactic_results = []
         lsj_results = []
+
         nominal_forms_results = []
         verbal_forms_results = []
         accent_rules_results = []
         prefix_results = []
-        lemma_generalization_results = []
-        custom_results = []
+
         double_accent_recursion_results = []
-        case_ending_recursion_results = []
         reversed_elision_recursion_results = []
+        case_ending_recursion_results = []
+        oxytonization_results = []
         decapitalization_results = []
+        
+        hypotactic_results = []
             
         def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False, reversed_elision_pass=False):
             '''
@@ -340,7 +350,7 @@ class Macronizer:
                     prefix_match = prefix
                     macronized_prefix_match = macronized_prefix
 
-                    unprefixed_lemma = lemma.removeprefix(prefix) # cool python 3.9 method!
+                    unprefixed_lemma = lemma.removeprefix(prefix)
                     unprefixed_lemma = only_bases(unprefixed_lemma)
                     logging.debug(f'\t Unprefixed lemma for {token}: {unprefixed_lemma}')
                     break
@@ -543,9 +553,9 @@ class Macronizer:
 
                 if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     case_ending_recursion_results.append(macronized_token)
-                    logging.debug(f'\t✅ Wrong-case-ending helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                    logging.debug(f'\t✅ Wrong-case-ending (D2) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
-                    logging.debug(f'\t❌ Wrong-case-ending did not help')
+                    logging.debug(f'\t❌ Wrong-case-ending (D2) did not help')
             
             # 1st declension
             if not different_ending_pass and len(token) > 2 and (only_bases(lemma[-1]) == 'α' or only_bases(lemma[-1]) == 'η') and "Fem" in morph.get("Gender"):
@@ -554,20 +564,47 @@ class Macronizer:
                 restored_token = ''
 
                 # gen sing
-                if (only_bases(token)[-2:] == 'ης' or only_bases(token)[-2:] == 'ας') and 'Gen' in morph.get("Case"):
-                    nominative_token = token[:-2] + lemma[-1]
+                if (token[-2:] == 'ης' or token[-2:] == 'ας') and 'Gen' in morph.get("Case"): # e.g. οἰκίας
+                    nominative_token = token[:-1] # e.g. οἰκία
+                if token[-2:] == 'ῆς' and 'Gen' in morph.get("Case"): # e.g. καλῆς
+                    nominative_token = token[:-2] + 'ή' # e.g. καλή, note that this does not accomodate -α following non-ειρ.
+                if token[-2:] == 'ᾶς' and 'Gen' in morph.get("Case"): # e.g. καλᾶς
+                    nominative_token = token[:-2] + 'ά' # e.g. καλά
+                else:
+                    nominative_token = ""
+                if nominative_token:
                     nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
-                    if nominative_token[-1] == '^' or nominative_token[-1] == '_':
-                        nominative_token = nominative_token[:-1] + lemma[-1]
-                    restored_token = nominative_token[:-1] + token[-2:]
+                    if nominative_token[-1] == '^' or nominative_token[-1] == '_': # e.g. κα^λά_ ; note that ending changes so is not to be macronized
+                        restored_token = nominative_token[:-2] + token[-2:] # e.g. κα^λ + ᾶς
+                    else:
+                        restored_token = nominative_token[:-1] + token[-2:] # e.g. κα^λά => κα^λ + ᾶς
 
                 # dat sing
-                if (token[-1] == 'ῃ' or token[-1] == 'ῇ' or token[-1] == 'ᾳ' or token[-1] == 'ᾷ') and 'Dat' in morph.get("Case"):
+                if (token[-1] == 'ῃ' or token[-1] == 'ῇ' or token[-1] == 'ᾳ' or token[-1] == 'ᾷ') and 'Dat' in morph.get("Case") and pos == 'NOUN': # adjectives have D1 lemmata
                     nominative_token = macronized_token[:-1] + lemma[-1]
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    if nominative_token[-1] == '^' or nominative_token[-1] == '_':
+                        restored_token = nominative_token[:-2] + token[-1:] # e.g. κα^λ + ῇ
+                    else:
+                        restored_token = nominative_token[:-1] + token[-1:]
 
                 # acc sing
-                if (only_bases(token)[-2:] == 'ην' or only_bases(token)[-2:] == 'αν') and 'Acc' in morph.get("Case"):
+                if (only_bases(token)[-2:] == 'ην' or only_bases(token)[-2:] == 'αν') and 'Acc' in morph.get("Case") and pos == 'NOUN': # adjectives have D1 lemmata
                     nominative_token = macronized_token[:-2] + lemma[-1]
+                    nominative_token = macronization_modules(nominative_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=True, is_lemma=is_lemma)
+                    if nominative_token[-1] == '^' or nominative_token[-1] == '_':
+                        restored_token = nominative_token[:-2] + token[-1]
+                    else: 
+                        restored_token = nominative_token[:-1] + token[-1]
+                
+                if restored_token:
+                    macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+
+                    if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                        case_ending_recursion_results.append(macronized_token)
+                        logging.debug(f'\t✅ Wrong-case-ending (D1) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                    else:
+                        logging.debug(f'\t❌ Wrong-case-ending (D1) did not help')
             
             ### OXYTONIZING RECURSION ###
             if (
@@ -586,13 +623,12 @@ class Macronizer:
                     rebarytonized_token = oxytonized_token[:-2] + replace_acute_with_grave(oxytonized_token[-2:])
                 macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                 if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    oxytonization_results.append(macronized_token)
                     logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
                     logging.debug(f'\t❌ Oxytonizing did not help')
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
-                if macronized_token.replace('^', '').replace('_', '') == 'Διὰ':
-                    logging.debug(f'FOUND A Διὰ: {macronized_token}, {token} {lemma}, {pos}, {morph}')
                 return macronized_token
 
             ### DECAPITALIZING RECURSION ###
@@ -682,19 +718,22 @@ class Macronizer:
         # MODULE EFFICACY LISTS
 
         results_dict = {
+            "custom_results": custom_results,
             "wiktionary_results": wiktionary_results,
-            "hypotactic_results": hypotactic_results,
             "lsj_results": lsj_results,
+
             "nominal_forms_results": nominal_forms_results,
             "verbal_forms_results": verbal_forms_results,
             "accent_rules_results": accent_rules_results,
             "prefix_results": prefix_results,
-            "lemma_generalization_results": lemma_generalization_results,
-            "custom_results": custom_results,
+
             "double_accent_recursion_results": double_accent_recursion_results,
             "case_ending_recursion_results": case_ending_recursion_results,
             "reversed_elision_recursion_results": reversed_elision_recursion_results,
+            "oxytonization_results": oxytonization_results,
             "decapitalization_results": decapitalization_results,
+
+            "hypotactic_results": hypotactic_results,
         }
 
         module_dir = Path("diagnostics") / "modules"

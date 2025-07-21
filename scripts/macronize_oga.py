@@ -151,7 +151,9 @@ with open(args.output_file, 'a', encoding='utf-8') as out_f: # 'a' = append mode
             tqdm.write(f"\n⚠️ Chunk-level error at lines {absolute_start_line}–{absolute_start_line + len(chunk_lines)}: {e}")
 
 time_end = time.time()
-print(f"\nMacronization completed for batch {batch_nr} in {time_end - time_start:.2f} seconds.")
+total_time = (time_end - time_start) / 60**2 # Convert seconds to hours
+
+print(f"\nMacronization completed for batch {batch_nr} in {total_time:.2f} hours.")
 
 print(f"-----------------------------------------------------")
 print(f"---------- Stats for batch {batch_nr} ---------------")

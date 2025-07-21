@@ -18,12 +18,12 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 greek_ano_teleia = "\u0387"
 greek_question_mark = "\u037e"
 middle_dot = "\u00b7"
-apostrophes = "'’‘´΄\u02bc͵" # the last one is for thousands
+apostrophes = "'’‘´΄\u02bc᾿͵" # the last one is for thousands
 
 def word_list(text):
-    greek_punctuation = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>«»\-—…|⏑⏓†×]' # NOTE hyphens must be escaped (AI usually misses this)
+    to_clean = r'[\u0387\u037e\u00b7\.,!?;:\"()\[\]{}<>«»\-—…|⏑⏓†×]' # NOTE hyphens must be escaped (AI usually misses this)
     
-    cleaned_text = re.sub(greek_punctuation, ' ', text)
+    cleaned_text = re.sub(to_clean, ' ', text)
 
     word_list = [word for word in cleaned_text.split() if word]
     
@@ -50,10 +50,12 @@ class Text:
 
         ### Clean non-Greek characters and punctuation
 
-        chars_to_clean = r'[\^_()\[\]{}<>\"«»\-—…|⏑⏓†×]' # pipes actually appear in OGA
+        chars_to_clean = r'[\^_()\[\]{}<>⟨⟩⎡⎤\"«»\-—…|⏑⏓†×]'
+        oga = r'[#$%&*+/=@~£¦§¨ª¬¯°±²³¶¸¹½¿ÁÄÆÈÉÌÍÒÓÖÚÜßàáâäæçèéëìíïòóôö÷ùúüýÿĀāćĎďĹŒœŕźƑǁȳɛʰʳ˘˙˝ˡˢˣ̠̣͎̀́̄̅̆̇̈̊̔͂͞ͅ΅ЗСҀҁҏӄӔӕֹלݲតហឲាិេᵃᵅᵇᵈᵉᵊᵍᵏᵐᵒᵖᵗᵘᵛᵝᶜᶠᶦᶹḍḿṃẂẃẉạụỳ‐‒–―‖✶❮❯⟦⟧⥼⥽⦵⨆⩚⩹⫯⸕⸢⸣⸤⸥⸨〈〉ﬀﬁ＊－｢�𐅵𝒢𝒮𝔮𝕷‹›※‾⁄⁎⁑⁰ⁱ⁴⁵⁶⁷⁸⁹ⁿ€™ℵ∗√∠∴∼∾⊏⊔⊙⊢⊣⊤⊻⋃⋆⋇⋖⌈⌉⌊⌋⌞⌟⏒⏔⏕─═║△○◻★☼☾☿♀♂♃♄]' # OCR errors in OGA; rarely found in edited digital edition
 
         before_odycy = text
         before_odycy = re.sub(chars_to_clean, '', before_odycy)
+        before_odycy = re.sub(oga, '', before_odycy)
 
         ### Normalize
 
