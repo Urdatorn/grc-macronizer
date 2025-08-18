@@ -4,6 +4,8 @@
 # To clean all of them, pipe them to git rm with xargs:
 # > git ls-files --ignored --cached --exclude-standard | xargs git rm --cached
 
+.vscode/
+
 # ignore all pycache and pytest_cache dirs at all depths (note the slash to  the right)
 **__pycache__/
 .pytest_cache/

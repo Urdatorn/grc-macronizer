@@ -8,7 +8,6 @@ from difflib import SequenceMatcher
 import os
 import re
 
-from grc_macronizer import Macronizer
 from grc_utils import vowel, syllabifier
 from move_text_into_brackets import move_text_into_brackets
 
@@ -42,9 +41,6 @@ if os.path.exists(stoplist_file):
         wordform_stoplist = set(line.strip() for line in f if line.strip())
 else:
     wordform_stoplist = set()
-
-# ---------- Macronizer ----------
-macronizer = Macronizer(no_hypotactic=True, make_prints=False)
 
 files = sorted([
     f for f in os.listdir(base_dir)

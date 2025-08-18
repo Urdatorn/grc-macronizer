@@ -31,7 +31,7 @@ stoplist_file = "/Users/albin/git/norma-syllabarum-graecarum/stoplist.txt"
 
 # Hardcoded file stoplist (filenames)
 file_stoplist = {
-    "norma_aristophanis_canticorum.txt",
+#    "norma_aristophanis_canticorum.txt",
 }
 
 # ANSI colors
