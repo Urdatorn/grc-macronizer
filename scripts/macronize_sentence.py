@@ -6,7 +6,7 @@ from grc_utils import colour_dichrona_in_open_syllables
 
 macronizer = Macronizer(make_prints=False, doc_from_file=False)
 
-input = "καθ' ἃς φαίνε' ὑπ' αὐτῶν καθ' ἑκάστην ἡμέραν"
+input = "Δαρείου καὶ Παρυσάτιδος γίγνονται παῖδες δύο, πρεσβύτερος μὲν Ἀρταξέρξης, νεώτερος δὲ Κῦρος"
 
 time_start = time.time()
 output = macronizer.macronize(input)
