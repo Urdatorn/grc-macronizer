@@ -11,9 +11,8 @@ A quick and superficial presentation of the method and the results is included i
 # Installation
 
 - Create a virtual environment with Python 3.12. Nothing will work if you don't get this step right!
-- After having initialized your venv, activate it and install the right version of spaCy, the dependency of odyCy, with `pip install spacy==3.7.5`.
-- Navigate to `external/grc_odycy_joint_trf` and install odyCy locally with `pip install grc_odycy_joint_trf-0.7.0-py3-none-any.whl`, while making sure that you are still in the venv with Python 3.12 you created earlier. 
-- Install the submodule `grc-utils` with `cd grc-utils` and `pip install .`.
+- After having initialized your venv, activate it, make sure you are in the repository root dir and install the package locally with `pip install -e .`
+- Check if installation went well by running `python scripts/macronize_tests.py`
 
 # How to use
 
@@ -35,7 +34,11 @@ for line in output_split[:500]:
     print(line)
 ```
 
-Note that if you have a newer spaCy pipeline for Ancient Greek, it is easy to substitute it for odyCy. Indeed, the rest of the software has no legacy dependencies and should run with the latest python. 
+Note that if you have a newer spaCy pipeline for Ancient Greek, it is easy to substitute it for odyCy. Indeed, the *rest of the software has no legacy dependencies and should run with the latest python*.
+
+# Machine Learning
+
+This software was used to prepare training data for different transformer models, which pick up on and generalize the regularities and slightly improve the scores on the [SOTA benchmark for macronization]()
 
 # License
 
