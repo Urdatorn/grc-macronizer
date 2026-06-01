@@ -17,7 +17,8 @@
 **temp/
 
 # build artifacts
-src/grc_macronizer.egg-info
+grc_macronizer.egg-info/
+dist/
 
 # behind-the-scenes stuff
 scripts/dev
@@ -35,6 +36,6 @@ odycy_docs/
 !odycy_docs/Δαρείου-καὶ-914bda29da71bd7b.spacy
 
 # unused db
-src/grc_macronizer/db/hypotactic.py
-src/grc_macronizer/db/wiktionary_old.py
-src/grc_macronizer/db/wiktionary_example.py
+grc_macronizer/db/hypotactic.py
+grc_macronizer/db/wiktionary_old.py
+grc_macronizer/db/wiktionary_example.py

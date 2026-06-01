@@ -32,7 +32,6 @@ requires-python = "==3.12.*"
 license = "MIT"
 license-files = ["LICENSE"]
 
-
 [project.urls]
 Homepage = "https://github.com/Urdatorn/grc_macronizer"
 
@@ -40,11 +39,11 @@ Homepage = "https://github.com/Urdatorn/grc_macronizer"
 dev = []
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["grc_macronizer*"]
 
 [tool.setuptools.package-data]
-grc_macronizer = ["db/*.pkl"]
+grc_macronizer = ["db/*.pkl"] # non .py files needed
