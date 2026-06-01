@@ -1,4 +1,0 @@
-# IMPORTANT: 
-# DO NOT INCLUDE __init__.py OTHERWISE IMPORTS WILL NOT WORK
-.DS_Store
-__pycache__
