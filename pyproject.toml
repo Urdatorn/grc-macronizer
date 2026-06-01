@@ -17,10 +17,11 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "grc_utils==0.2.0",
+    "grc_utils==0.2.2",
 
     # odyCy
-    "spacy>=3.7.4,<3.8.0",
+    "spacy==3.7.5",
+    "click==8.1.8", # needed for spacy's CLI utils
     "grc-odycy-joint-trf @ https://huggingface.co/chcaa/grc_odycy_joint_trf/resolve/main/grc_odycy_joint_trf-0.7.0-py3-none-any.whl",
 
     # Other
@@ -28,7 +29,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "xxhash"
 ]
-requires-python = "==3.12.*"
+requires-python = "==3.12.2"
 license = "MIT"
 license-files = ["LICENSE"]
 
