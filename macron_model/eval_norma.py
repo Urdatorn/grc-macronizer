@@ -1,16 +1,24 @@
 """
 eval_norma.py
 
-Evaluation harness for the "Norma Syllabarum Graecarum" (NSG) benchmark
-(https://github.com/Urdatorn/norma-syllabarum-graecarum): manually annotated
-Ancient Greek excerpts used to score automatic vowel-length (macron)
-annotation of the three "dichrona" (ambiguous-length) letters alpha, iota
-and upsilon.
+Evaluation harness for the "Norma Syllabarum Graecarum" (NSG) benchmark:
+manually annotated Ancient Greek excerpts used to score automatic
+vowel-length (macron) annotation of the three "dichrona" (ambiguous-length)
+letters alpha, iota and upsilon.
+
+The benchmark is loaded from HuggingFace by default
+(https://huggingface.co/datasets/Urdatorn/norma, source="hf"), or from a
+local git clone of https://github.com/Urdatorn/norma-syllabarum-graecarum
+(source="git"). These are NOT the same benchmark: the HF version
+deliberately excludes two works (insolem, pindar) that also appear in a
+separate training corpus, to avoid train/test contamination -- so scores
+from the two sources are not directly comparable. Pick one source and
+stick with it for any given comparison.
 
 ------------------------------------------------------------------------
 Benchmark layout
 ------------------------------------------------------------------------
-The benchmark ships the same 16 texts twice, in two parallel directories:
+Either source ships the same texts twice, in two parallel directories:
 
   norma_syllabify/<work>.txt   syllable brackets only, e.g.
       [Ἥ]{λι}{ο}[ν ὑμ][νεῖ][ν αὖ]{τε }{Δι}[ὸς ]{τέ}{κο}[ς ἄρ]{χε}{ο }[Μοῦ]{σα}
@@ -82,12 +90,49 @@ from grc_utils import DICHRONA, vowel
 # ---------------------------------------------------------------------------
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-NORMA_ROOT = os.environ.get(
+
+# "git" source: a local clone of norma-syllabarum-graecarum, either given
+# directly via NORMA_ROOT or assumed to sit as a sibling directory of this
+# script (the layout used while the benchmark lived only on GitHub).
+GIT_NORMA_ROOT = os.environ.get(
     "NORMA_ROOT", os.path.join(_HERE, "norma-syllabarum-graecarum")
 )
-SYLLABIFY_DIR = os.path.join(NORMA_ROOT, "norma_syllabify")
-MACRONIZE_DIR = os.path.join(NORMA_ROOT, "norma_macronize")
-STOPLIST_PATH = os.path.join(NORMA_ROOT, "stoplist.txt")
+
+# "hf" source (default): the benchmark also ships as a HuggingFace dataset
+# repo, using the identical norma_macronize/*.txt + norma_syllabify/*.txt
+# layout (no new parsing logic needed, just a download step). This is the
+# canonical evaluation set going forward: it deliberately excludes two
+# works present in the git clone (insolem, pindar) that also appear in a
+# separate training corpus, to avoid train/test contamination. Numbers
+# from source="hf" and source="git" are therefore NOT directly comparable
+# (different work counts) -- pick one source and stick with it.
+DEFAULT_NORMA_HF_REPO = "Urdatorn/norma"
+
+
+def resolve_norma_dirs(source: str = "hf", repo_id: str = DEFAULT_NORMA_HF_REPO,
+                        norma_root: Optional[str] = None):
+    """Returns (syllabify_dir, macronize_dir, stoplist_path) for the chosen
+    source. `norma_root`, if given, always wins and is used verbatim (both
+    sources share the same on-disk layout, so this works for either)."""
+    if norma_root is None:
+        if source == "git":
+            norma_root = GIT_NORMA_ROOT
+        elif source == "hf":
+            from huggingface_hub import snapshot_download
+
+            norma_root = snapshot_download(
+                repo_id=repo_id,
+                repo_type="dataset",
+                allow_patterns=["norma_macronize/*", "norma_syllabify/*", "stoplist.txt"],
+            )
+        else:
+            raise ValueError(f"Unknown source {source!r}, expected 'git' or 'hf'")
+
+    return (
+        os.path.join(norma_root, "norma_syllabify"),
+        os.path.join(norma_root, "norma_macronize"),
+        os.path.join(norma_root, "stoplist.txt"),
+    )
 
 MARK_CHARS = "^_"
 
@@ -222,10 +267,10 @@ def _word_stoplist_flags(text: str, stoplist: set) -> List[bool]:
     return flags
 
 
-def _load_stoplist() -> set:
-    if not os.path.exists(STOPLIST_PATH):
+def _load_stoplist(stoplist_path: str) -> set:
+    if not os.path.exists(stoplist_path):
         return set()
-    with open(STOPLIST_PATH, encoding="utf-8") as f:
+    with open(stoplist_path, encoding="utf-8") as f:
         return {
             unicodedata.normalize("NFC", line.strip())
             for line in f
@@ -247,12 +292,12 @@ class LineRecord:
     in_stoplist: List[bool]          # whether plain[i]'s word form is stoplisted
 
 
-def _list_works() -> List[str]:
-    files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(SYLLABIFY_DIR, "*.txt")))
+def _list_works(syllabify_dir: str, macronize_dir: str) -> List[str]:
+    files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(syllabify_dir, "*.txt")))
     works = [os.path.splitext(f)[0] for f in files]
     missing = [
         w for w in works
-        if not os.path.exists(os.path.join(MACRONIZE_DIR, w + ".txt"))
+        if not os.path.exists(os.path.join(macronize_dir, w + ".txt"))
     ]
     if missing:
         raise FileNotFoundError(
@@ -262,20 +307,28 @@ def _list_works() -> List[str]:
     return works
 
 
-def load_corpus() -> Dict[str, List[LineRecord]]:
+def load_corpus(source: str = "hf", repo_id: str = DEFAULT_NORMA_HF_REPO,
+                 norma_root: Optional[str] = None) -> Dict[str, List[LineRecord]]:
     """Parses every work in the benchmark into a list of LineRecord.
-    Pure function of the on-disk benchmark files; safe to cache."""
-    stoplist = _load_stoplist()
+
+    source : "hf" (default) downloads/caches the benchmark from the
+        HuggingFace dataset repo `repo_id` (Urdatorn/norma). "git" reads a
+        local clone instead (NORMA_ROOT env var, or a norma-syllabarum-graecarum
+        sibling directory of this script). `norma_root`, if given, overrides
+        either source and is used directly.
+    """
+    syllabify_dir, macronize_dir, stoplist_path = resolve_norma_dirs(source, repo_id, norma_root)
+    stoplist = _load_stoplist(stoplist_path)
     corpus: Dict[str, List[LineRecord]] = {}
 
-    for work in _list_works():
+    for work in _list_works(syllabify_dir, macronize_dir):
         syll_lines = (
-            open(os.path.join(SYLLABIFY_DIR, work + ".txt"), encoding="utf-8")
+            open(os.path.join(syllabify_dir, work + ".txt"), encoding="utf-8")
             .read()
             .splitlines()
         )
         macro_lines = (
-            open(os.path.join(MACRONIZE_DIR, work + ".txt"), encoding="utf-8")
+            open(os.path.join(macronize_dir, work + ".txt"), encoding="utf-8")
             .read()
             .splitlines()
         )
@@ -368,6 +421,9 @@ def evaluate(
     batch_by_work: bool = True,
     works: Optional[List[str]] = None,
     verbose: bool = True,
+    source: str = "hf",
+    repo_id: str = DEFAULT_NORMA_HF_REPO,
+    norma_root: Optional[str] = None,
 ) -> Dict[str, object]:
     """Runs `macronize_fn` over the Norma Syllabarum Graecarum benchmark and
     scores it against gold.
@@ -380,7 +436,8 @@ def evaluate(
     use_stoplist : bool
         If True (default, matching the benchmark's own suggestion), gold
         word forms listed in stoplist.txt (rare proper names etc.) are
-        excluded from scoring.
+        excluded from scoring. Only the "git" source currently ships a
+        stoplist.txt; with "hf" this is silently a no-op.
     batch_by_work : bool
         If True (default), all lines of a work are joined with "\\n" and
         passed to `macronize_fn` in a single call (falling back to one call
@@ -391,10 +448,13 @@ def evaluate(
         Restrict evaluation to these work names (default: all 16).
     verbose : bool
         Print progress per work while running.
+    source : "hf" (default) or "git" -- see load_corpus().
+    repo_id : HuggingFace dataset repo to use when source="hf".
+    norma_root : explicit local directory override for either source.
 
     Returns a dict: {"per_work": {work: WorkResult, ...}, "total": WorkResult}
     """
-    corpus = load_corpus()
+    corpus = load_corpus(source=source, repo_id=repo_id, norma_root=norma_root)
     if works is not None:
         unknown = set(works) - set(corpus)
         if unknown:
@@ -531,6 +591,15 @@ if __name__ == "__main__":
                      help="Path to a trained macron_model/ checkpoint (e.g. runs/v1_gpu/best) "
                           "to evaluate instead of the rule-based macronizer.")
     ap.add_argument("--device", default=None, help="cuda / cpu, only used with --model_dir")
+    ap.add_argument("--source", choices=["hf", "git"], default="hf",
+                     help="Where to load Norma Syllabarum Graecarum from: the HuggingFace "
+                          f"dataset repo (default, {DEFAULT_NORMA_HF_REPO!r}), or a local "
+                          "git clone ('git' -- NORMA_ROOT env var, or a "
+                          "norma-syllabarum-graecarum sibling directory of this script).")
+    ap.add_argument("--norma_repo", default=DEFAULT_NORMA_HF_REPO,
+                     help="HuggingFace dataset repo id, only used with --source hf.")
+    ap.add_argument("--norma_root", default=None,
+                     help="Explicit local directory override, bypassing --source entirely.")
     args = ap.parse_args()
 
     if args.model_dir:
@@ -547,15 +616,18 @@ if __name__ == "__main__":
         macronize_fn = macronizer.macronize
         label = "rule-based grc-macronizer"
 
-    print(f"Running {label} over Norma Syllabarum Graecarum...\n", file=sys.stderr)
-    results = evaluate(macronize_fn, use_stoplist=True)
+    eval_kwargs = dict(source=args.source, repo_id=args.norma_repo, norma_root=args.norma_root)
+
+    print(f"Running {label} over Norma Syllabarum Graecarum "
+          f"(source={args.source})...\n", file=sys.stderr)
+    results = evaluate(macronize_fn, use_stoplist=True, **eval_kwargs)
     print()
     print("=== WITH stoplist exclusion (default) ===")
     print(format_report(results))
 
     print(file=sys.stderr)
     print("Re-running with stoplist exclusion OFF for comparison...\n", file=sys.stderr)
-    results_no_stop = evaluate(macronize_fn, use_stoplist=False)
+    results_no_stop = evaluate(macronize_fn, use_stoplist=False, **eval_kwargs)
     print()
     print("=== WITHOUT stoplist exclusion ===")
     print(format_report(results_no_stop))
