@@ -1,6 +1,6 @@
 ---
 language: grc
-license: mit
+license: gpl-3.0
 tags:
 - ancient-greek
 - vowel-length
@@ -48,19 +48,40 @@ rule-based system is known to be incomplete rather than wrong where it commits.
 
 ## Evaluation
 
-Evaluated on [Norma Syllabarum Graecarum](https://github.com/Urdatorn/norma-syllabarum-graecarum),
-a manually-annotated benchmark spanning 16 authors/works and both prose and verse.
-See the accompanying paper for the comparison against the rule-based baseline.
+Evaluated on [Norma Syllabarum Graecarum](https://huggingface.co/datasets/Urdatorn/norma),
+a manually-annotated benchmark spanning 15 works (prose and verse; two further
+works are held out of this HF version specifically to avoid overlap with a
+separate training corpus). Scored with the identical harness
+(`macron_model/eval_norma.py`) against the bundled rule-based macronizer,
+counting a left-unmarked dichronon as an implicit "short" guess for both
+systems (`default_short_accuracy` below) so abstention isn't unfairly
+penalized either way:
+
+| system | accuracy (unmarked defaults to short) | raw accuracy | unmarked / total |
+|---|---|---|---|
+| rule-based grc-macronizer | 89.46% | 57.57% | 769 / 1916 |
+| **this model** | **90.66%** | **90.55%** | **6 / 1916** |
+
+The model modestly outperforms the rule-based system on the fair metric while
+resolving essentially every position (99.7% coverage vs. 60%), since it
+learned to generalize past the cases the rule-based system couldn't commit to.
 
 ## Usage
 
 ```python
+import sys
+sys.path.insert(0, "path/to/grc-macronizer/macron_model")  # for predict.py
 from predict import MacronPredictor
 
-predictor = MacronPredictor("path/to/checkpoint")
+predictor = MacronPredictor("path/to/downloaded/checkpoint")
 macronized = predictor.macronize("ανθρωπος ανηρ")
-# -> "α^νθρωπος α^νηρ"
+# -> "α^νθρωπος α_νηρ"
 ```
+
+`MacronPredictor` expects the checkpoint directory (containing
+`config.json`/`model.safetensors`) plus a sibling or parent `diacritic_vocab.json`
+(see `predict.py` for the exact lookup logic). The `predict.py`/`tokenizer.py`
+source lives in [grc-macronizer/macron_model](https://github.com/Urdatorn/grc-macronizer/tree/oga-macronization-improvements/macron_model).
 
 ## Citation
 
@@ -70,4 +91,5 @@ If you use this model, please cite:
 
 ## License
 
-MIT, matching the underlying grc-macronizer training-data generator.
+GNU GPL v3, matching [grc-macronizer](https://github.com/Urdatorn/grc-macronizer)
+(the training-data generator this model's code ships alongside).
