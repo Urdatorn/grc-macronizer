@@ -17,6 +17,7 @@ import json
 import os
 
 import torch
+from huggingface_hub import hf_hub_download
 
 from model import MacronizerModel
 from tokenizer import (
@@ -37,12 +38,16 @@ class MacronPredictor:
         self.model = MacronizerModel.from_pretrained(model_dir).to(self.device)
         self.model.eval()
 
-        vocab_path = os.path.join(model_dir, "diacritic_vocab.json")
-        if not os.path.exists(vocab_path):
-            # checkpoints are saved under <output_dir>/best or /final; the vocab
-            # is saved once at <output_dir>/diacritic_vocab.json
-            vocab_path = os.path.join(os.path.dirname(os.path.normpath(model_dir)),
-                                       "diacritic_vocab.json")
+        if os.path.isdir(model_dir):
+            vocab_path = os.path.join(model_dir, "diacritic_vocab.json")
+            if not os.path.exists(vocab_path):
+                # checkpoints are saved under <output_dir>/best or /final; the vocab
+                # is saved once at <output_dir>/diacritic_vocab.json
+                vocab_path = os.path.join(os.path.dirname(os.path.normpath(model_dir)),
+                                           "diacritic_vocab.json")
+        else:
+            # model_dir is a Hub repo id (e.g. "Ericu950/oga-macronizer-char")
+            vocab_path = hf_hub_download(repo_id=model_dir, filename="diacritic_vocab.json")
         with open(vocab_path, encoding="utf-8") as f:
             self.vocab = DiacriticVocab.from_dict(json.load(f))
 
