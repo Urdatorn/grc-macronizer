@@ -76,7 +76,7 @@ def main():
     ap.add_argument("--diacritic_mask_p", type=float, default=0.3,
                      help="Probability of stripping a character's diacritics during training, "
                           "so the model also learns to macronize unaccented input.")
-    ap.add_argument("--val_fraction", type=float, default=0.02)
+    ap.add_argument("--val_fraction", type=float, default=0.10)
     ap.add_argument("--hidden_size", type=int, default=128)
     ap.add_argument("--num_hidden_layers", type=int, default=4)
     ap.add_argument("--num_attention_heads", type=int, default=4)
@@ -84,6 +84,9 @@ def main():
     ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--eval_every_steps", type=int, default=1000)
     ap.add_argument("--log_every_steps", type=int, default=100)
+    ap.add_argument("--patience", type=int, default=5,
+                     help="Stop after this many consecutive evals with no improvement in val "
+                          "accuracy over the best-so-far. Set to 0 to disable early stopping.")
     ap.add_argument("--num_workers", type=int, default=4)
     ap.add_argument("--encode_workers", type=int, default=8,
                      help="parallel workers for the one-off dataset-encoding pass")
@@ -149,6 +152,26 @@ def main():
     )
 
     best_val_acc = -1.0
+    evals_without_improvement = 0
+    stop_early = False
+
+    def run_eval(step_label):
+        nonlocal best_val_acc, evals_without_improvement, stop_early
+        metrics = evaluate(model, val_loader, args.device)
+        print(f"  [eval @ {step_label}] loss {metrics['loss']:.4f} acc {metrics['accuracy']:.4%} "
+              f"per_class {metrics['per_class_accuracy']} n={metrics['per_class_n']}")
+        if metrics["accuracy"] > best_val_acc:
+            best_val_acc = metrics["accuracy"]
+            evals_without_improvement = 0
+            model.save_pretrained(os.path.join(args.output_dir, "best"))
+            print(f"  new best ({best_val_acc:.4%}), saved to {args.output_dir}/best")
+        else:
+            evals_without_improvement += 1
+            if args.patience > 0 and evals_without_improvement >= args.patience:
+                print(f"  no improvement for {evals_without_improvement} evals "
+                      f"(patience={args.patience}) -- stopping early")
+                stop_early = True
+
     step = 0
     t0 = time.time()
     for epoch in range(args.epochs):
@@ -169,21 +192,16 @@ def main():
                       f"lr {scheduler.get_last_lr()[0]:.2e} ({elapsed:.0f}s)")
 
             if step % args.eval_every_steps == 0:
-                metrics = evaluate(model, val_loader, args.device)
-                print(f"  [eval @ step {step}] loss {metrics['loss']:.4f} acc {metrics['accuracy']:.4%} "
-                      f"per_class {metrics['per_class_accuracy']} n={metrics['per_class_n']}")
-                if metrics["accuracy"] > best_val_acc:
-                    best_val_acc = metrics["accuracy"]
-                    model.save_pretrained(os.path.join(args.output_dir, "best"))
-                    print(f"  new best ({best_val_acc:.4%}), saved to {args.output_dir}/best")
+                run_eval(f"step {step}")
+                if stop_early:
+                    break
 
-        metrics = evaluate(model, val_loader, args.device)
-        print(f"[epoch {epoch} end] loss {metrics['loss']:.4f} acc {metrics['accuracy']:.4%} "
-              f"per_class {metrics['per_class_accuracy']} n={metrics['per_class_n']}")
-        if metrics["accuracy"] > best_val_acc:
-            best_val_acc = metrics["accuracy"]
-            model.save_pretrained(os.path.join(args.output_dir, "best"))
-            print(f"  new best ({best_val_acc:.4%}), saved to {args.output_dir}/best")
+        if stop_early:
+            break
+
+        run_eval(f"epoch {epoch} end")
+        if stop_early:
+            break
 
     model.save_pretrained(os.path.join(args.output_dir, "final"))
     print(f"Done. Best val accuracy: {best_val_acc:.4%}. Final model saved to {args.output_dir}/final")
