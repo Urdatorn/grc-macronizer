@@ -32,6 +32,10 @@ def main():
     ap.add_argument("--vocab_dir", required=True)
     ap.add_argument("--test_conllu", required=True)
     ap.add_argument("--use_macron_plane", action="store_true")
+    ap.add_argument("--macron_plane_mode", choices=["real", "random", "constant"], default="real",
+                     help="Must match whatever the checkpoint was trained with -- evaluating a "
+                          "random/constant-trained model with 'real' input (or vice versa) is a "
+                          "train/test mismatch, not a meaningful number.")
     ap.add_argument("--batch_size", type=int, default=32)
     ap.add_argument("--max_len", type=int, default=384)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -51,11 +55,11 @@ def main():
     print(f"test examples: {len(test_ds)}")
 
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
-                              collate_fn=make_collate_fn(args.use_macron_plane))
+                              collate_fn=make_collate_fn(args.use_macron_plane, macron_plane_mode=args.macron_plane_mode))
 
     model = TaggerModel.from_pretrained(args.checkpoint).to(args.device)
     print(f"Loaded {args.checkpoint} ({model.num_parameters_readable()} params, "
-          f"use_macron_plane={model.config.use_macron_plane})")
+          f"use_macron_plane={model.config.use_macron_plane}, macron_plane_mode={args.macron_plane_mode})")
 
     metrics = evaluate(model, test_loader, args.device)
     print(f"\nTest set results ({args.test_conllu}):")
