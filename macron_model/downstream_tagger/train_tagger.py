@@ -103,6 +103,15 @@ def main():
                           "the first run creates these, the second reuses them.")
     ap.add_argument("--output_dir", required=True)
     ap.add_argument("--use_macron_plane", action="store_true")
+    ap.add_argument("--macron_plane_mode", choices=["real", "random", "constant"], default="real",
+                     help="Confound control (only matters with --use_macron_plane): 'random' "
+                          "independently randomizes the macron plane per position (same "
+                          "architecture/capacity, zero information -- isolates whether the gain "
+                          "is from macron info or just extra capacity); 'constant' pins it to "
+                          "MACRON_NONE everywhere (weaker control, embedding row can still learn "
+                          "a bias). --train_conllu/--dev_conllu should still point at the "
+                          "*.macronized.conllu files so char sequences stay identical to the "
+                          "real-macron run.")
     ap.add_argument("--max_len", type=int, default=384)
     ap.add_argument("--batch_size", type=int, default=32)
     ap.add_argument("--epochs", type=int, default=30)
@@ -144,7 +153,7 @@ def main():
                             macronized=args.use_macron_plane, max_len=args.max_len)
     print(f"train examples: {len(train_ds)}, dev examples: {len(dev_ds)}")
 
-    collate_fn = make_collate_fn(args.use_macron_plane)
+    collate_fn = make_collate_fn(args.use_macron_plane, macron_plane_mode=args.macron_plane_mode)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                                collate_fn=collate_fn, num_workers=args.num_workers, drop_last=True)
     dev_loader = DataLoader(dev_ds, batch_size=args.batch_size, shuffle=False,
@@ -164,7 +173,7 @@ def main():
     )
     model = TaggerModel(config).to(args.device)
     print(f"Model: {model.num_parameters_readable()} parameters on {args.device} "
-          f"(use_macron_plane={args.use_macron_plane})")
+          f"(use_macron_plane={args.use_macron_plane}, macron_plane_mode={args.macron_plane_mode})")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     total_steps = max(1, len(train_loader) * args.epochs)

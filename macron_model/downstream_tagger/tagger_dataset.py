@@ -140,7 +140,19 @@ class TaggerDataset(Dataset):
         return self.examples[idx]
 
 
-def make_collate_fn(use_macron_plane):
+def make_collate_fn(use_macron_plane, macron_plane_mode="real"):
+    '''macron_plane_mode (only matters when use_macron_plane=True):
+      - "real": plane3 carries the transformer's actual macron predictions (default)
+      - "random": plane3 is independently randomized (uniform over none/short/long)
+        at every real character position -- same architecture, same parameter count,
+        zero mutual information with true macron status. Confound control for
+        "is the gain from the extra capacity, or from the macron information?"
+      - "constant": plane3 is always MACRON_NONE (id 0) at every real position --
+        the weaker of the two controls suggested in review (the embedding row can
+        still be learned as a bias, but carries no per-position information at all).
+    '''
+    assert macron_plane_mode in ("real", "random", "constant")
+
     def collate_fn(batch):
         max_len = max(len(ex["plane1"]) for ex in batch)
         max_tokens = max(len(ex["spans"]) for ex in batch)
@@ -168,6 +180,12 @@ def make_collate_fn(use_macron_plane):
             nt = len(ex["spans"])
             xpos_labels[i, :nt] = torch.tensor(ex["xpos_labels"], dtype=torch.long)
             lemma_labels[i, :nt] = torch.tensor(ex["lemma_labels"], dtype=torch.long)
+
+        if use_macron_plane and macron_plane_mode == "random":
+            real_positions = attention_mask.bool()
+            plane3[real_positions] = torch.randint(0, 3, (int(real_positions.sum()),))
+        elif use_macron_plane and macron_plane_mode == "constant":
+            plane3[attention_mask.bool()] = 0
 
         out = {
             "plane1_ids": plane1,
