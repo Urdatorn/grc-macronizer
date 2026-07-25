@@ -4,3 +4,8 @@ runs/
 diagnostics/
 *.log
 diagnostic_*.txt
+norma-syllabarum-graecarum/
+
+# Derived/regeneratable -- see downstream_tagger/README.md "Usage" to rebuild
+# (macronize_conllu.py on the gold train0/dev0/test.conllu, which ARE tracked)
+downstream_tagger/data/*.macronized.conllu
