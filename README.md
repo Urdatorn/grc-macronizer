@@ -38,7 +38,7 @@ Note that if you have a newer spaCy pipeline for Ancient Greek, it is easy to su
 
 # Machine Learning
 
-This software was used to prepare training data for different transformer models, which pick up on and generalize the regularities and slightly improve the scores on the [SOTA benchmark for macronization]()
+This software was used to prepare training data for different transformer models, which pick up on and generalize the regularities and slightly improve the scores on the [SOTA benchmark for macronization](https://huggingface.co/datasets/Urdatorn/norma)
 
 # License
 
