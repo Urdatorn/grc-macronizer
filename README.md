@@ -46,4 +46,4 @@ This software was used to prepare training data for different transformer models
 
 This repository is under the copyleft GNU GPL 3 license (compatible with the MIT license), which means you are more than welcome to fork and build on this software for your own open-science research, as long as your code retains an equally generous licensing. If you have found this repository useful, please cite it in the following way:
 
-> Thörn Cleland, Albin and Eric Cullhed (2025). Automatic Annotation of Ancient Greek Vowel Length. Forthcoming.
+> Thörn Cleland, Albin and Eric Cullhed (Forthcoming). Automatic Annotation of Ancient Greek Vowel Length.
