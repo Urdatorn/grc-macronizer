@@ -1,5 +1,6 @@
 # A Macronizer for Ancient Greek
 
+[![DOI](zenodo.24287341.svg)](https://doi.org/10.5281/zenodo.24287341)
 ![PyPI](https://img.shields.io/pypi/v/grc-macronizer?color=blue&label=PyPI&logo=python&logoColor=white)
 
 <img src="docs/media/macronizer.gif" width="300">
