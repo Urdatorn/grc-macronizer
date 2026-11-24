@@ -174,7 +174,8 @@ class Text:
         fail_counter = 0
         buggy_words_in_input = 0
         token_lemma_pos_morph = []
-        for doc in tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False): # don't worry, pipe() returns docs in the right order
+        token_sentence_indices = [] # for each entry of token_lemma_pos_morph, the index of its doc (sentence)
+        for doc_idx, doc in enumerate(tqdm(docs, desc="Extracting words to macronize from the odyCy docs", leave=False)): # don't worry, pipe() returns docs in the right order
             for token in doc:
                 logging.debug(f"Considering token: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
                 if token.text == 'ἂν' or token.text == 'ἄν':
@@ -238,6 +239,7 @@ class Text:
                         logging.debug(f"\033Popping an {macronized_an}! {len(an_list)} left to pop")
                     else:
                         token_lemma_pos_morph.append([orth, token.lemma_, token.pos_, token.morph])
+                    token_sentence_indices.append(doc_idx)
                     logging.debug(f"\tAppended: \tToken: {token.text}\tLemma: {token.lemma_}\tPOS: {token.pos_}\tMorph: {token.morph}")
 
         assert an_list == [], f"An list is not empty: {an_list}. This means that the ἂν macronization step failed. Please check the code."
@@ -252,6 +254,7 @@ class Text:
         self.genre = genre
         self.docs = docs
         self.token_lemma_pos_morph = token_lemma_pos_morph
+        self.token_sentence_indices = token_sentence_indices
         self.macronized_words = [] # populated by class_macronizer
         self.macronized_text = ''
         self.debug = debug

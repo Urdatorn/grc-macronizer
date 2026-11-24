@@ -16,7 +16,15 @@ loses at most the chunks in flight: rerunning the same command truncates any
 half-written chunk, skips finished chunks and files, and continues. When every
 file is done, the parts are joined in sorted file order into
 oga_macronized.txt, with totals in oga_macronized_stats.tsv and, per module,
-the number of tokens it helped macronize in oga_macronized_modules.tsv.
+oga_macronized_modules.tsv: tokens_helped (success events at any recursion
+depth, overlapping between modules), and top_level_tokens / top_level_dichrona
+(the top-level credits, which add up to what the cascade resolved).
+
+Diagnostics go to diagnostics/ in the working directory. Each worker logs to its
+own file, diagnostics/logs/macronizer_<timestamp>_<pid>.log (every line also
+carries the pid), with "CHUNK START" / "CHUNK END" lines around each chunk, and
+the per-call diagnostics (module results, still-ambiguous tokens, per-token
+traces) are named <stem>.<chunk>, e.g. tlg0012.tlg001...lemma.00003.
 
 Usage:
     python scripts/macronize_oga_corpus.py --conllu-glob '/path/to/conllu/*.conllu' \
@@ -25,6 +33,7 @@ Usage:
 
 import argparse
 import collections
+import logging
 import glob as globmod
 import os
 import shutil
@@ -50,6 +59,9 @@ def _init_worker(parts_dir):
     global _worker_tmp_dir, _parts_dir
     _worker_tmp_dir = tempfile.mkdtemp(prefix=f"oga_macronize_{os.getpid()}_")
     _parts_dir = Path(parts_dir)
+    # the forked worker inherited the parent's log file; give it its own
+    from grc_macronizer.class_macronizer import configure_logging
+    configure_logging()
 
 
 def _sync(f):
@@ -60,18 +72,19 @@ def _sync(f):
 def _read_progress(progress_path):
     '''
     Returns (chunks_done, byte offset of the part file after the last
-    recorded chunk, lines, numerator, denominator, module counts) from a
-    progress file with one "chunk_idx offset n_lines numerator denominator
-    module=count,..." row per finished chunk (rows written before the
-    module column existed have five columns). A torn last row (killed
-    mid-write) is ignored.
+    recorded chunk, lines, numerator, denominator, module counts, top-level
+    credits) from a progress file with one "chunk_idx offset n_lines numerator
+    denominator module=count,... module=tokens:dichrona,..." row per finished
+    chunk (rows written before the module and credit columns existed have five
+    or six columns). A torn last row (killed mid-write) is ignored.
     '''
     done, offset, n_lines, numerator, denominator = 0, 0, 0, 0, 0
     modules = collections.Counter()
+    credits = collections.Counter()  # (module, "tokens" | "dichrona") -> count
     if progress_path.exists():
         for row in progress_path.read_text(encoding="utf-8").splitlines():
             cols = row.split("\t")
-            if len(cols) not in (5, 6):
+            if len(cols) not in (5, 6, 7):
                 continue
             idx, off, n, num, den = map(int, cols[:5])
             done, offset = idx + 1, off
@@ -82,7 +95,13 @@ def _read_progress(progress_path):
                 for kv in cols[5].split(","):
                     name, count = kv.split("=")
                     modules[name] += int(count)
-    return done, offset, n_lines, numerator, denominator, modules
+            if len(cols) == 7 and cols[6]:
+                for kv in cols[6].split(","):
+                    name, value = kv.split("=")
+                    tokens, dichrona = value.split(":")
+                    credits[(name, "tokens")] += int(tokens)
+                    credits[(name, "dichrona")] += int(dichrona)
+    return done, offset, n_lines, numerator, denominator, modules, credits
 
 
 def _chunks(sentences, size):
@@ -110,7 +129,7 @@ def _process_file(conllu_path):
     progress_path = _parts_dir / f"{stem}.progress"
 
     # resume: drop output of a chunk that was being written when the run died
-    chunks_done, offset, n_lines, numerator, denominator, _ = _read_progress(progress_path)
+    chunks_done, offset, n_lines, numerator, denominator, _, _ = _read_progress(progress_path)
     with open(part_path, "ab") as f:
         f.truncate(offset)
 
@@ -132,15 +151,20 @@ def _process_file(conllu_path):
 
             chunk_text = "\n".join(texts) + "\n"
 
-            chunk_lines, chunk_num, chunk_den, chunk_modules = [], 0, 0, {}
+            chunk_lines, chunk_num, chunk_den, chunk_modules, chunk_credits = [], 0, 0, {}, {}
+            tag = f"{stem}.{chunk_idx:05d}"
+            logging.info(f"=== CHUNK START {tag} sentences={len(texts)} ===")
             try:
                 macronizer = Macronizer(make_prints=False, doc_from_file=False,
                                          no_hypotactic=False, lowercase=False,
                                          custom_doc=docbin_path)
-                output = macronizer.macronize(chunk_text)
+                output = macronizer.macronize(chunk_text, diagnostics_tag=tag)
                 chunk_modules = macronizer.module_counts
+                chunk_credits = {name: (macronizer.module_credit_tokens[name], macronizer.module_credit_dichrona[name])
+                                 for name in macronizer.module_credit_tokens}
             except Exception as e:
                 sys.stderr.write(f"[{stem} chunk {chunk_idx}] ERROR: {e}\n")
+                logging.error(f"CHUNK ERROR {tag}: {e}")
                 output = ""  # recorded as done with no lines, so a resume does not retry it
             finally:
                 os.remove(docbin_path)
@@ -156,8 +180,10 @@ def _process_file(conllu_path):
                 part_f.write(line + "\n")
             _sync(part_f)
             module_col = ",".join(f"{name}={count}" for name, count in chunk_modules.items())
-            progress_f.write(f"{chunk_idx}\t{part_f.tell()}\t{len(chunk_lines)}\t{chunk_num}\t{chunk_den}\t{module_col}\n")
+            credit_col = ",".join(f"{name}={t}:{d}" for name, (t, d) in chunk_credits.items())
+            progress_f.write(f"{chunk_idx}\t{part_f.tell()}\t{len(chunk_lines)}\t{chunk_num}\t{chunk_den}\t{module_col}\t{credit_col}\n")
             _sync(progress_f)
+            logging.info(f"=== CHUNK END {tag} lines={len(chunk_lines)} resolved={chunk_num}/{chunk_den} ===")
 
             n_lines += len(chunk_lines)
             numerator += chunk_num
@@ -216,13 +242,16 @@ def main():
 
     total_num, total_den = 0, 0
     total_modules = collections.Counter()
+    total_credits = collections.Counter()
     with open(combined_path, "w", encoding="utf-8") as combined_f:
         for p in files:
             stem = Path(p).stem
             n_lines, numerator, denominator = map(int, (parts_dir / f"{stem}.done").read_text().split("\t"))
             total_num += numerator
             total_den += denominator
-            total_modules.update(_read_progress(parts_dir / f"{stem}.progress")[5]) # update(), not +=, keeps modules with zero counts
+            progress = _read_progress(parts_dir / f"{stem}.progress")
+            total_modules.update(progress[5]) # update(), not +=, keeps modules with zero counts
+            total_credits.update(progress[6])
             with open(parts_dir / f"{stem}.txt", encoding="utf-8") as part_f:
                 shutil.copyfileobj(part_f, combined_f)
 
@@ -231,10 +260,11 @@ def main():
         f.write(f"denominator\t{total_den}\n")
         f.write(f"ratio\t{total_num/total_den if total_den else 0:.4f}\n")
 
+    credit_names = [n for n, kind in total_credits if kind == "tokens"]
     with open(modules_path, "w", encoding="utf-8") as f:
-        f.write("module\ttokens_helped\n")
-        for name, count in total_modules.items():
-            f.write(f"{name}\t{count}\n")
+        f.write("module\ttokens_helped\ttop_level_tokens\ttop_level_dichrona\n")
+        for name in list(total_modules) + [n for n in dict.fromkeys(credit_names) if n not in total_modules]:
+            f.write(f"{name}\t{total_modules.get(name, '')}\t{total_credits[(name, 'tokens')]}\t{total_credits[(name, 'dichrona')]}\n")
 
     print(f"\nDone in {(time.time()-t0)/60:.1f} min. "
           f"Overall macronization ratio: {total_num/total_den if total_den else 0:.2%}")
