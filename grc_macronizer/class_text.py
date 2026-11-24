@@ -282,7 +282,7 @@ class Text:
             NOTE re the regex: \b does not work for strings containing apostrophe!
             Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit w to match word boundaries instead.
             '''
-            matches = list(re.finditer(fr"(?<!\w){normalized_word}(?!\w)", self.text))
+            matches = list(re.finditer(fr"(?<![\w']){re.escape(normalized_word)}(?![\w'])", self.text)) # the apostrophe counts as part of a word, or καθ would also match the start of καθ' and both replacements would land on the same span
             matches = [m for m in matches if (m.group() != "ἂν" or m.group() != "ἄν" or m.group() != "ἀν")] # remove ἂν and ἄν from the list of matches, since they are already macronized
 
             if current_count >= len(matches):
