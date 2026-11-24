@@ -25,7 +25,11 @@ custom_macron_map = {
     "τὰ": "τὰ^",
     "τὰς": "τὰ_ς",
 
-    # Crases
+    # Particles and adverbs whose Wiktionary match comes from an unrelated paradigm
+    "ἵνα": "ἵ^να^", # Wiktionary singleton gives ῐ̔́νᾱ (from a verb table)
+    "μάλα": "μά^λα^", # Wiktionary singleton gives μᾰ́λᾱ (vocative of another noun)
+
+    # Crases (the crasis alpha after the first consonant is handled by mark_crasis in class_macronizer.py)
     "τοὔνομα": "τοὔνομα^",
     "κἀκ": "κἀ_κ",
 
@@ -464,7 +468,12 @@ custom_macron_map = {
     "συνέβη": "συ^νέβη",
     "παραχρῆμα": "πα^ρα^χρῆμα^",
     "στόματος": "στόμα^τος",
-    "πυρὶ": "πυ_ρὶ^",
+    # πῦρ: the oblique cases have short υ (πῠρός, πῠρί). Listed here so that the
+    # LSJ headword πυρός "wheat" (πῡρός) does not mark the far more common genitive long.
+    "πυρός": "πυ^ρός",
+    "πυρὸς": "πυ^ρὸς",
+    "πυρί": "πυ^ρί^",
+    "πυρὶ": "πυ^ρὶ^",
     "λαὸς": "λα_ὸς",
     "ὁτιοῦν": "ὁτι^οῦν",
     "σχήματος": "σχήμα^τος",

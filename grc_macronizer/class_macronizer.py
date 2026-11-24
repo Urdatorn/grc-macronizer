@@ -66,6 +66,24 @@ with hypotactic_path.open("rb") as f:
 # --- Main class ---  #
 #######################
 
+# Crasis: a coronis on the second letter (κἀγώ, τἀπί, χἄμα, θἀτέρου) marks a vowel contracted
+# across a word boundary, and a contracted vowel is long. The breathing sign never sits on a
+# non-initial vowel otherwise, so the pattern is unambiguous.
+_CRASIS_RE = re.compile(r'^([κτχθΚΤΧΘ])([ἀἄἂἈἌἊ])[\^_]?')
+
+
+def mark_crasis(token):
+    """
+    >>> mark_crasis('κἀγώ')
+    'κἀ_γώ'
+    >>> mark_crasis('τἀ^πὶ')
+    'τἀ_πὶ'
+    >>> mark_crasis('καλά')
+    'καλά'
+    """
+    return _CRASIS_RE.sub(r'\1\2_', token)
+
+
 class Macronizer:
     def __init__(self, 
                  macronize_everything=True,
@@ -205,7 +223,7 @@ class Macronizer:
             else:
                 logging.debug(f'🔄 Macronizing: {token} ({lemma}, {pos}, {morph})')
 
-            macronized_token = token
+            macronized_token = mark_crasis(token)
 
             ### CUSTOM OVERRIDING ###
 
@@ -690,6 +708,7 @@ class Macronizer:
         for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=self.make_prints):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
+            result = mark_crasis(result) # no later module may overwrite the long crasis vowel
             result = re.sub(r"'[\^_]", "'", result) # a mark after an elision apostrophe belongs to the elided vowel
             if count_dichrona_in_open_syllables(result) > 0:
                 still_ambiguous.append((result, lemma, pos, morph))
