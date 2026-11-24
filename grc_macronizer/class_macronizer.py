@@ -159,7 +159,7 @@ class Macronizer:
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
         """
 
-        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc, lowercase=self.lowercase)
+        text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc) # lowercase only the output (see the return), since lowercased input hides proper names from odyCy and the dbs
         token_lemma_pos_morph = text_object.token_lemma_pos_morph # format: [[orth, token.lemma_, token.pos_, token.morph], ...]
 
         # lists to keep track of the modules' efficacy
@@ -789,8 +789,10 @@ class Macronizer:
                     count = counts[item[0]]
                     f.write(f"{count}\t{item[0]}\t{item[1]}\t{item[2]}\t{item[3]}\n")
 
+        if self.lowercase:
+            return lower_grc(text_object.macronized_text)
         return text_object.macronized_text
-    
+
     def macronization_ratio(self, text, macronized_text, count_all_dichrona=True, count_proper_names=True):
         def remove_proper_names(text):
             # Build a regex pattern that matches whole words from the set
