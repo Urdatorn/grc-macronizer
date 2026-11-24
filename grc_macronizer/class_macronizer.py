@@ -23,6 +23,7 @@ from .format_macrons import macron_unicode_to_markup, merge_or_overwrite_markup
 from .morph_disambiguator import morph_disambiguator
 from .nominal_forms import macronize_nominal_forms
 from .sanity_check import demacronize_diphthong, macronized_diphthong
+from .lunate import has_lunate, normalize_lunate, restore_spelling
 from .verbal_forms import macronize_verbal_forms
 
 ####################
@@ -689,7 +690,16 @@ class Macronizer:
         still_ambiguous = []
         for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=self.make_prints):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
-            result = macronization_modules(token, lemma, pos, morph)
+            if has_lunate(token) and not any(m in token for m in "^_"):
+                # look up with ordinary sigmas, then put the lunate spelling back (see lunate.py)
+                result = macronization_modules(normalize_lunate(token), normalize_lunate(lemma), pos, morph)
+                restored = restore_spelling(result, token)
+                if restored is None:
+                    logging.warning(f"Lunate sigma: could not align {result} with {token}; leaving it unmacronized")
+                    restored = token
+                result = restored
+            else:
+                result = macronization_modules(token, lemma, pos, morph)
             result = re.sub(r"'[\^_]", "'", result) # a mark after an elision apostrophe belongs to the elided vowel
             if count_dichrona_in_open_syllables(result) > 0:
                 still_ambiguous.append((result, lemma, pos, morph))
