@@ -153,6 +153,12 @@ AGDT_TENSE = {
 NO_SPACE_BEFORE = set(",.;··;!?·)]}»”’’›")
 NO_SPACE_AFTER = set("([{«“‘‘‹")
 
+# The apostrophe variants that Text normalizes to U+0027 before building its
+# reference word list (class_text.py). Token forms must be normalized the same
+# way, or elided tokens like OGA's διείποιμʼ (U+02BC) are not found in that list
+# and are skipped.
+APOSTROPHES = str.maketrans({c: "'" for c in "’‘\u02bc´΄᾿"})
+
 
 class OgaToken(NamedTuple):
     form: str
@@ -196,6 +202,7 @@ def iter_conllu(path: str | Path) -> Iterator[list[OgaToken]]:
                 continue
 
             _id, form, lemma, upos, xpos, feats_str, _head, _deprel, _deps, misc = cols
+            form = form.translate(APOSTROPHES)
 
             if misc.startswith("e_"):
                 continue  # editorial marker (gap, [0], [1], ...)

@@ -450,35 +450,22 @@ class Macronizer:
             '''
 
             elided_vowels = ["ε", "ι", "α"]
-            reversed_worked = False
             old_macronized_token = macronized_token
             if not reversed_elision_pass and token[-1] == "'":
-                reversed_elision_token = token[:-1] + elided_vowels[0] # remove the apostrophe and add a vowel
-                reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
-                logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
-                restored_token = reversed_elision_token[:-1] + "'"
-                macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
-                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
-                    reversed_worked = True
-                    reversed_elision_recursion_results.append(macronized_token)
-                    logging.debug(f'\t✅ Reversed elision with iota macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-                else:
-                    logging.debug(f'\t❌ Reversed elision with epsilon macronization did not help')
-
-            if not reversed_worked and not reversed_elision_pass and token[-1] == "'":
-                reversed_elision_token = token[:-1] + elided_vowels[1] # remove the apostrophe and add a vowel
-                reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
-                logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
-                if reversed_elision_token[-1] == '^' or reversed_elision_token[-1] == '_': # I have encountered pathological cases with long ultima
-                    restored_token = reversed_elision_token[:-2] + "'"
-                else:
-                    restored_token = reversed_elision_token[:-1] + "'"
-                macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
-                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
-                    reversed_elision_recursion_results.append(macronized_token)
-                    logging.debug(f'\t✅ Reversed elision with iota macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-                else:
-                    logging.debug(f'\t❌ Reversed elision with iota macronization did not help either')
+                for elided_vowel in elided_vowels: # try each vowel until one helps
+                    reversed_elision_token = token[:-1] + elided_vowel # remove the apostrophe and add a vowel
+                    reversed_elision_token = macronization_modules(reversed_elision_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass, decapitalized_pass=decapitalized_pass, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=True)
+                    logging.debug(f'\t Reversed elision token: {reversed_elision_token}')
+                    if reversed_elision_token[-1] == '^' or reversed_elision_token[-1] == '_': # drop the restored vowel together with its mark
+                        restored_token = reversed_elision_token[:-2] + "'"
+                    else:
+                        restored_token = reversed_elision_token[:-1] + "'"
+                    macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
+                    if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                        reversed_elision_recursion_results.append(macronized_token)
+                        logging.debug(f'\t✅ Reversed elision with {elided_vowel} helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                        break
+                    logging.debug(f'\t❌ Reversed elision with {elided_vowel} did not help')
 
             ### WRONG-CASE-ENDING RECURSION ### 
 
@@ -703,6 +690,7 @@ class Macronizer:
         for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=self.make_prints):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
             result = macronization_modules(token, lemma, pos, morph)
+            result = re.sub(r"'[\^_]", "'", result) # a mark after an elision apostrophe belongs to the elided vowel
             if count_dichrona_in_open_syllables(result) > 0:
                 still_ambiguous.append((result, lemma, pos, morph))
             macronized_tokens.append(result)
