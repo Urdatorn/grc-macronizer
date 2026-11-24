@@ -56,6 +56,57 @@ from .db.ionic import ionic
 # short_masc_neut_alpha(token, tag)
 # short_dat(token, tag)
 
+def macronize_ma_stem_neuters(word, lemma, morph, debug=False):
+    '''
+    Neuter nouns in -μα, stem -ματ- (ὄνομα/ὀνόματος, πνεῦμα/πνεύματος,
+    πρᾶγμα/πράγματος, σῶμα/σώματος, ...): an extremely common, fully
+    regular declension class (from PIE *-mn-t-), whose stem alpha is
+    always short, with no known exceptions in any period or dialect.
+
+    This targets the MEDIAL stem alpha that masc_and_neutre_short_alpha
+    and dative_short_iota below cannot reach (they only ever look at the
+    final character). Where this same word ALSO has a final-character
+    ending those two rules would independently mark -- nom/acc/voc plural
+    -ατα, or dative plural -ασι(ν) -- this function reproduces that
+    (already independently established) logic inline, so both marks are
+    produced in a single pass; macronize_nominal_forms below returns on
+    the first sub-rule to fire, so a second, separate call would never
+    happen for the same word.
+
+    Deliberately does NOT fire on the bare nominative/accusative/vocative
+    singular (e.g. plain "ὄνομα"): that has no medial -ματ-/-μασ- to
+    match, and is left to masc_and_neutre_short_alpha as before.
+    '''
+    if not word or not lemma or morph is None:
+        return None
+
+    base_lemma = only_bases(lemma)
+    if not base_lemma.endswith('μα') or len(base_lemma) < 3:
+        return None
+    if 'Neut' not in morph.get("Gender"):
+        return None
+
+    root = base_lemma[:-1]  # e.g. "ονομα" -> "ονομ"
+    base_word = only_bases(word)
+    idx = len(root)  # position of the stem alpha in base_word/word
+
+    if not (base_word.startswith(root + 'ατ') or base_word.startswith(root + 'ασ')):
+        return None
+
+    marked = word[:idx + 1] + '^' + word[idx + 1:]
+
+    if base_word[-1:] == 'α' and 'Plur' in morph.get("Number"):
+        marked = marked + '^'  # nom/acc/voc plural -ατα
+    elif base_word[-1:] == 'ι' and 'Dat' in morph.get("Case"):
+        marked = marked + '^'  # dative singular -ματι
+    elif base_word[-2:] == 'ιν' and 'Dat' in morph.get("Case"):
+        marked = marked[:-1] + '^' + marked[-1]  # dative plural -ασιν (ny ephelkystikon)
+
+    if debug:
+        logging.debug(f'\033[1;32m{word}: -μα stem neuter\033[0m -> {marked}')
+
+    return marked
+
 def macronize_nominal_stem_suffixes(word, lemma, pos, morph, debug=False):
     '''
     The idea is to try and catch some common ways to form words; primarily adjectives.
@@ -155,12 +206,18 @@ def macronize_nominal_forms(word, lemma, pos, morph, debug=True):
                 return word
         return None
     
+    result = macronize_ma_stem_neuters(word, lemma, morph, debug=debug)
+    if result:
+        return result
+    else:
+        logging.debug("No -μα stem neuter!")
+
     result = first_declination(word, lemma, morph)
     if result:
         return result
     else:
         logging.debug("No 1D!")
-    
+
     result = masc_and_neutre_short_alpha(word, morph)
     if result:
         return result
@@ -291,6 +348,29 @@ if __name__ == "__main__":
         morph = token.morph
 
         assert macronize_nominal_forms(word, lemma, pos, morph, debug=True) == "χεροῖν"
+
+        # (Extra) -μα stem neuters (ὄνομα/ὀνόματος class): medial stem alpha
+        # is always short, with the relevant final-character ending mark
+        # (plural -ατα, dative -ασι(ν)) landing in the same pass.
+        for word_form, expected in [
+            ("ὀνόματι", "ὀνόμα^τι^"),
+            ("ὀνόματα", "ὀνόμα^τα^"),
+            ("ὀνομάτων", "ὀνομά^των"),
+            ("ὀνόμασι", "ὀνόμα^σι^"),
+            ("πνεύματι", "πνεύμα^τι^"),
+            ("πράγματος", "πράγμα^τος"),
+            ("ῥήματα", "ῥήμα^τα^"),
+        ]:
+            output = nlp(word_form)
+            token = output[0]
+            result = macronize_nominal_forms(token.orth_, token.lemma_, token.pos_, token.morph, debug=True)
+            assert result == expected, f"{word_form}: got {result!r}, expected {expected!r}"
+
+        # Bare nominative/accusative/vocative singular has no medial -ματ-/-μασ-
+        # to match; must be left to masc_and_neutre_short_alpha instead.
+        output = nlp("ὄνομα")
+        token = output[0]
+        assert macronize_ma_stem_neuters(token.orth_, token.lemma_, token.morph) is None
 
     except AssertionError:
         logging.debug(f"Assertion failed for input: {input}")

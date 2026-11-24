@@ -15,6 +15,22 @@ from .stop_list_epic import epic_stop_words
 
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+_cached_nlp = None
+
+def _get_odycy_nlp():
+    '''
+    grc_odycy_joint_trf.load() takes several seconds (disk I/O + weight
+    deserialization) and previously ran on every single Text() construction,
+    even in the custom_doc/doc_from_file branches where it is only ever used
+    for its .vocab (no forward pass). Caching it here is a pure performance
+    fix -- it does not change which model or vocab is used, only how often
+    it's loaded from disk.
+    '''
+    global _cached_nlp
+    if _cached_nlp is None:
+        _cached_nlp = grc_odycy_joint_trf.load()
+    return _cached_nlp
+
 greek_ano_teleia = "\u0387"
 greek_question_mark = "\u037e"
 middle_dot = "\u00b7"
@@ -118,14 +134,14 @@ class Text:
         docs = []
         if custom_doc != "":
             doc_bin = DocBin().from_disk(custom_doc)
-            nlp = grc_odycy_joint_trf.load()
+            nlp = _get_odycy_nlp()
             docs = list(doc_bin.get_docs(nlp.vocab))
         elif doc_from_file and output_file_name.exists():  # pathlib-style check
             doc_bin = DocBin().from_disk(output_file_name)
-            nlp = grc_odycy_joint_trf.load()
+            nlp = _get_odycy_nlp()
             docs = list(doc_bin.get_docs(nlp.vocab))
         else:
-            nlp = grc_odycy_joint_trf.load()
+            nlp = _get_odycy_nlp()
             if sentence_list:  # Only process if we have sentences
                 docs = list(tqdm(nlp.pipe(sentence_list), total=len(sentence_list), leave=False, desc="odyCy pipeline"))
                 doc_bin = DocBin()
