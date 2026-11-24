@@ -75,7 +75,7 @@ def _process_file(conllu_path):
 
         try:
             macronizer = Macronizer(make_prints=False, doc_from_file=False,
-                                     no_hypotactic=True, lowercase=True,
+                                     no_hypotactic=False, lowercase=False,
                                      custom_doc=docbin_path)
             output = macronizer.macronize(chunk_text)
         except Exception as e:
