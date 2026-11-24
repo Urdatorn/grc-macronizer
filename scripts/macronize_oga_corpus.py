@@ -200,6 +200,10 @@ def main():
     t0 = time.time()
     n_done = 0
 
+    # Import once in the parent: forked workers inherit the loaded databases instead of each
+    # importing them, which on a fresh checkout also compiles proper_names.py (several GB per worker).
+    import grc_macronizer  # noqa: F401
+
     with Pool(processes=args.workers, initializer=_init_worker, initargs=(str(parts_dir),)) as pool:
         for stem, n_lines, numerator, denominator in pool.imap_unordered(_process_file, todo):
             n_done += 1
