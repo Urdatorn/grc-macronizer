@@ -38,6 +38,7 @@ Homepage = "https://github.com/Urdatorn/grc_macronizer"
 
 [project.optional-dependencies]
 dev = []
+test = ["pytest>=8"]
 
 [tool.setuptools]
 include-package-data = true
@@ -48,3 +49,6 @@ include = ["grc_macronizer*"]
 
 [tool.setuptools.package-data]
 grc_macronizer = ["db/*.pkl"] # non .py files needed
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

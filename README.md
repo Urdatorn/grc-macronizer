@@ -14,6 +14,7 @@ A quick and superficial presentation of the method and the results is included i
 - Create a virtual environment with Python 3.12. Nothing will work if you don't get this step right!
 - After having initialized your venv, activate it, make sure you are in the repository root dir and install the package locally with `pip install -e .`
 - Check if installation went well by running `python scripts/macronize_tests.py`
+- Run the test suite with `pip install -e ".[test]"` and then `pytest` from the repository root
 
 # How to use
 
