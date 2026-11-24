@@ -108,8 +108,8 @@ class Text:
         
         ### Preëmptive macronization of a few straightforward words that odyCy doesn't handle well
 
-        before_odycy = re.sub(r'\sτἄλλα\s', 'τἄλλα^', before_odycy)
-        before_odycy = re.sub(r'\sἁ\s', 'ἁ_', before_odycy)
+        before_odycy = re.sub(r'(?<!\S)τἄλλα(?!\S)', 'τἄλλα^', before_odycy) # lookarounds keep the surrounding whitespace, which \s...\s used to eat, gluing words and lines together
+        before_odycy = re.sub(r'(?<!\S)ἁ(?!\S)', 'ἁ_', before_odycy)
 
         ### Create diagnostic word list
 
