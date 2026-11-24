@@ -15,7 +15,8 @@ flushed and fsynced; a finished file gets a <stem>.done marker. A killed run
 loses at most the chunks in flight: rerunning the same command truncates any
 half-written chunk, skips finished chunks and files, and continues. When every
 file is done, the parts are joined in sorted file order into
-oga_macronized.txt, with totals in oga_macronized_stats.tsv.
+oga_macronized.txt, with totals in oga_macronized_stats.tsv and, per module,
+the number of tokens it helped macronize in oga_macronized_modules.tsv.
 
 Usage:
     python scripts/macronize_oga_corpus.py --conllu-glob '/path/to/conllu/*.conllu' \
@@ -23,6 +24,7 @@ Usage:
 '''
 
 import argparse
+import collections
 import glob as globmod
 import os
 import shutil
@@ -58,22 +60,29 @@ def _sync(f):
 def _read_progress(progress_path):
     '''
     Returns (chunks_done, byte offset of the part file after the last
-    recorded chunk, lines, numerator, denominator) from a progress file
-    with one "chunk_idx offset n_lines numerator denominator" row per
-    finished chunk. A torn last row (killed mid-write) is ignored.
+    recorded chunk, lines, numerator, denominator, module counts) from a
+    progress file with one "chunk_idx offset n_lines numerator denominator
+    module=count,..." row per finished chunk (rows written before the
+    module column existed have five columns). A torn last row (killed
+    mid-write) is ignored.
     '''
     done, offset, n_lines, numerator, denominator = 0, 0, 0, 0, 0
+    modules = collections.Counter()
     if progress_path.exists():
         for row in progress_path.read_text(encoding="utf-8").splitlines():
             cols = row.split("\t")
-            if len(cols) != 5:
+            if len(cols) not in (5, 6):
                 continue
-            idx, off, n, num, den = map(int, cols)
+            idx, off, n, num, den = map(int, cols[:5])
             done, offset = idx + 1, off
             n_lines += n
             numerator += num
             denominator += den
-    return done, offset, n_lines, numerator, denominator
+            if len(cols) == 6 and cols[5]:
+                for kv in cols[5].split(","):
+                    name, count = kv.split("=")
+                    modules[name] += int(count)
+    return done, offset, n_lines, numerator, denominator, modules
 
 
 def _chunks(sentences, size):
@@ -101,7 +110,7 @@ def _process_file(conllu_path):
     progress_path = _parts_dir / f"{stem}.progress"
 
     # resume: drop output of a chunk that was being written when the run died
-    chunks_done, offset, n_lines, numerator, denominator = _read_progress(progress_path)
+    chunks_done, offset, n_lines, numerator, denominator, _ = _read_progress(progress_path)
     with open(part_path, "ab") as f:
         f.truncate(offset)
 
@@ -123,12 +132,13 @@ def _process_file(conllu_path):
 
             chunk_text = "\n".join(texts) + "\n"
 
-            chunk_lines, chunk_num, chunk_den = [], 0, 0
+            chunk_lines, chunk_num, chunk_den, chunk_modules = [], 0, 0, {}
             try:
                 macronizer = Macronizer(make_prints=False, doc_from_file=False,
                                          no_hypotactic=False, lowercase=False,
                                          custom_doc=docbin_path)
                 output = macronizer.macronize(chunk_text)
+                chunk_modules = macronizer.module_counts
             except Exception as e:
                 sys.stderr.write(f"[{stem} chunk {chunk_idx}] ERROR: {e}\n")
                 output = ""  # recorded as done with no lines, so a resume does not retry it
@@ -145,7 +155,8 @@ def _process_file(conllu_path):
             for line in chunk_lines:
                 part_f.write(line + "\n")
             _sync(part_f)
-            progress_f.write(f"{chunk_idx}\t{part_f.tell()}\t{len(chunk_lines)}\t{chunk_num}\t{chunk_den}\n")
+            module_col = ",".join(f"{name}={count}" for name, count in chunk_modules.items())
+            progress_f.write(f"{chunk_idx}\t{part_f.tell()}\t{len(chunk_lines)}\t{chunk_num}\t{chunk_den}\t{module_col}\n")
             _sync(progress_f)
 
             n_lines += len(chunk_lines)
@@ -179,6 +190,7 @@ def main():
     parts_dir.mkdir(parents=True, exist_ok=True)
     combined_path = out_dir / "oga_macronized.txt"
     stats_path = out_dir / "oga_macronized_stats.tsv"
+    modules_path = out_dir / "oga_macronized_modules.tsv"
 
     todo = [p for p in files if not (parts_dir / f"{Path(p).stem}.done").exists()]
     todo.sort(key=os.path.getsize, reverse=True)  # largest first, so no big file is left for the tail
@@ -199,12 +211,14 @@ def main():
                   f"({elapsed:.0f}s elapsed, ETA {eta/60:.1f}min)", flush=True)
 
     total_num, total_den = 0, 0
+    total_modules = collections.Counter()
     with open(combined_path, "w", encoding="utf-8") as combined_f:
         for p in files:
             stem = Path(p).stem
             n_lines, numerator, denominator = map(int, (parts_dir / f"{stem}.done").read_text().split("\t"))
             total_num += numerator
             total_den += denominator
+            total_modules.update(_read_progress(parts_dir / f"{stem}.progress")[5]) # update(), not +=, keeps modules with zero counts
             with open(parts_dir / f"{stem}.txt", encoding="utf-8") as part_f:
                 shutil.copyfileobj(part_f, combined_f)
 
@@ -212,6 +226,11 @@ def main():
         f.write(f"numerator\t{total_num}\n")
         f.write(f"denominator\t{total_den}\n")
         f.write(f"ratio\t{total_num/total_den if total_den else 0:.4f}\n")
+
+    with open(modules_path, "w", encoding="utf-8") as f:
+        f.write("module\ttokens_helped\n")
+        for name, count in total_modules.items():
+            f.write(f"{name}\t{count}\n")
 
     print(f"\nDone in {(time.time()-t0)/60:.1f} min. "
           f"Overall macronization ratio: {total_num/total_den if total_den else 0:.2%}")

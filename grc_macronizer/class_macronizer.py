@@ -736,14 +736,16 @@ class Macronizer:
             "hypotactic_results": hypotactic_results,
         }
 
+        self.module_counts = {name.removesuffix("_results"): len(result_list) for name, result_list in results_dict.items()} # for callers that aggregate across calls
+
         module_dir = Path("diagnostics") / "modules"
         module_dir.mkdir(parents=True, exist_ok=True)  # better than os.makedirs
 
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f") # one stamp per call, unique across parallel processes with the pid
         for name, result_list in results_dict.items():
             logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            out_path = module_dir / f"{timestamp}_{name}.txt"
+            out_path = module_dir / f"{timestamp}_{os.getpid()}_{name}.txt"
             with out_path.open("w", encoding="utf-8") as f:
                 for word in result_list:
                     f.write(f"{word}\n")
