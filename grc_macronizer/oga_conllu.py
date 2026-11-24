@@ -165,10 +165,18 @@ class OgaToken(NamedTuple):
 def parse_conllu(path: str | Path) -> list[list[OgaToken]]:
     """
     Parse one OGA CoNLL-U file into a list of sentences, each a list of
-    OgaToken. Editorial markers (MISC starting with "e_") and rows with
-    undefined UPOS ("-") are dropped entirely, as are blank-FORM rows.
+    OgaToken. See iter_conllu() for the filtering.
     """
-    sentences: list[list[OgaToken]] = []
+    return list(iter_conllu(path))
+
+
+def iter_conllu(path: str | Path) -> Iterator[list[OgaToken]]:
+    """
+    Yield the sentences of one OGA CoNLL-U file one at a time, each a list
+    of OgaToken, so a whole file never has to be held in memory. Editorial
+    markers (MISC starting with "e_") and rows with undefined UPOS ("-")
+    are dropped entirely, as are blank-FORM rows.
+    """
     current: list[OgaToken] = []
 
     with open(path, "r", encoding="utf-8") as f:
@@ -176,7 +184,7 @@ def parse_conllu(path: str | Path) -> list[list[OgaToken]]:
             line = raw_line.rstrip("\n")
             if not line:
                 if current:
-                    sentences.append(current)
+                    yield current
                     current = []
                 continue
             if line.startswith("#"):
@@ -206,9 +214,7 @@ def parse_conllu(path: str | Path) -> list[list[OgaToken]]:
             current.append(OgaToken(form=form, lemma=lemma, upos=upos, xpos=xpos, feats=feats))
 
     if current:
-        sentences.append(current)
-
-    return sentences
+        yield current
 
 
 def _build_morph_string(tok: OgaToken) -> tuple[str, str]:
