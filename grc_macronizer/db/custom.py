@@ -1,6 +1,25 @@
 from grc_utils import normalize_word, lower_grc, upper_grc
 
 custom_macron_map = {
+    # Athens (place name and ethnonym): initial alpha is uncontroversially short
+    # throughout the whole paradigm of both words, in every period/genre.
+    "Ἀθῆναι": "Ἀ^θῆναι",
+    "Ἀθήνας": "Ἀ^θήνας",
+    "Ἀθηνῶν": "Ἀ^θηνῶν",
+    "Ἀθήναις": "Ἀ^θήναις",
+    "Ἀθήνησι": "Ἀ^θήνησι^",
+    "Ἀθήνησιν": "Ἀ^θήνησι^ν",
+    "Ἀθήναζε": "Ἀ^θήναζε",
+    "Ἀθηναῖος": "Ἀ^θηναῖος",
+    "Ἀθηναῖε": "Ἀ^θηναῖε",
+    "Ἀθηναῖον": "Ἀ^θηναῖον",
+    "Ἀθηναίου": "Ἀ^θηναίου",
+    "Ἀθηναίῳ": "Ἀ^θηναίῳ",
+    "Ἀθηναῖοι": "Ἀ^θηναῖοι",
+    "Ἀθηναίων": "Ἀ^θηναίων",
+    "Ἀθηναίοις": "Ἀ^θηναίοις",
+    "Ἀθηναίους": "Ἀ^θηναίους",
+
     # Articles
     "ἁ": "ἁ_", # doric ἡ
     "τὰ": "τὰ^",
