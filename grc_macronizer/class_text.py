@@ -5,6 +5,7 @@ from tqdm import tqdm
 import warnings
 
 import grc_odycy_joint_trf
+import spacy
 from spacy.tokens import DocBin
 import xxhash
 
@@ -30,6 +31,20 @@ def _get_odycy_nlp():
     if _cached_nlp is None:
         _cached_nlp = grc_odycy_joint_trf.load()
     return _cached_nlp
+
+_cached_vocab = None
+
+def _get_blank_vocab():
+    '''
+    A blank Ancient Greek vocab for reading pre-annotated docs (custom_doc).
+    A DocBin stores its own strings, so the docs come out identical to those
+    read with odyCy's vocab, without loading odyCy's weights (about 2 GB
+    less peak memory per process).
+    '''
+    global _cached_vocab
+    if _cached_vocab is None:
+        _cached_vocab = spacy.blank('grc').vocab
+    return _cached_vocab
 
 greek_ano_teleia = "\u0387"
 greek_question_mark = "\u037e"
@@ -134,8 +149,7 @@ class Text:
         docs = []
         if custom_doc != "":
             doc_bin = DocBin().from_disk(custom_doc)
-            nlp = _get_odycy_nlp()
-            docs = list(doc_bin.get_docs(nlp.vocab))
+            docs = list(doc_bin.get_docs(_get_blank_vocab()))
         elif doc_from_file and output_file_name.exists():  # pathlib-style check
             doc_bin = DocBin().from_disk(output_file_name)
             nlp = _get_odycy_nlp()

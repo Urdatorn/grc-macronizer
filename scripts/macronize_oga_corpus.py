@@ -4,8 +4,9 @@ Macronize the full OGA corpus using its own pre-computed CoNLL-U annotation
 producing plain macronized sentences as ML training data (one per line).
 
 Parallelized across a multiprocessing.Pool, one conllu file per work item. Each
-worker process loads the odyCy vocab once (cached at module level in
-grc_macronizer.class_text) and reuses it for every chunk/file it processes.
+worker process creates a blank spaCy vocab once (cached at module level in
+grc_macronizer.class_text) and reuses it for every chunk/file it processes;
+odyCy's weights are never loaded.
 
 Usage:
     python scripts/macronize_oga_corpus.py --conllu-glob '/path/to/conllu/*.conllu' \
@@ -34,19 +35,17 @@ _worker_tmp_dir = None
 
 def _init_worker():
     global _worker_tmp_dir
-    import grc_odycy_joint_trf  # noqa: F401  -- trigger download/cache check once
     _worker_tmp_dir = tempfile.mkdtemp(prefix=f"oga_macronize_{os.getpid()}_")
 
 
 def _process_file(conllu_path):
     from spacy.tokens import DocBin
     from grc_macronizer import Macronizer
-    from grc_macronizer.class_text import _get_odycy_nlp
+    from grc_macronizer.class_text import _get_blank_vocab
     from grc_macronizer.oga_conllu import parse_conllu, build_doc
     from grc_utils import count_dichrona_in_open_syllables
 
-    nlp = _get_odycy_nlp()
-    vocab = nlp.vocab
+    vocab = _get_blank_vocab()
 
     sentences = parse_conllu(conllu_path)
     stem = Path(conllu_path).stem
