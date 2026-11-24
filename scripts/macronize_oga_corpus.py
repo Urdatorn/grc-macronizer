@@ -8,6 +8,15 @@ worker process creates a blank spaCy vocab once (cached at module level in
 grc_macronizer.class_text) and reuses it for every chunk/file it processes;
 odyCy's weights are never loaded.
 
+Each file is streamed in chunks of CHUNK_SIZE sentences, so a worker holds at
+most one chunk in memory. After every chunk, its output is appended to
+<out-dir>/parts/<stem>.txt and the chunk is recorded in <stem>.progress, both
+flushed and fsynced; a finished file gets a <stem>.done marker. A killed run
+loses at most the chunks in flight: rerunning the same command truncates any
+half-written chunk, skips finished chunks and files, and continues. When every
+file is done, the parts are joined in sorted file order into
+oga_macronized.txt, with totals in oga_macronized_stats.tsv.
+
 Usage:
     python scripts/macronize_oga_corpus.py --conllu-glob '/path/to/conllu/*.conllu' \
         --out-dir out/ --workers 16 [--limit-files 5]
@@ -16,6 +25,7 @@ Usage:
 import argparse
 import glob as globmod
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -31,67 +41,122 @@ sys.path.insert(0, str(REPO_ROOT))
 CHUNK_SIZE = 500  # sentences per Macronizer() call / temp docbin
 
 _worker_tmp_dir = None
+_parts_dir = None
 
 
-def _init_worker():
-    global _worker_tmp_dir
+def _init_worker(parts_dir):
+    global _worker_tmp_dir, _parts_dir
     _worker_tmp_dir = tempfile.mkdtemp(prefix=f"oga_macronize_{os.getpid()}_")
+    _parts_dir = Path(parts_dir)
+
+
+def _sync(f):
+    f.flush()
+    os.fsync(f.fileno())
+
+
+def _read_progress(progress_path):
+    '''
+    Returns (chunks_done, byte offset of the part file after the last
+    recorded chunk, lines, numerator, denominator) from a progress file
+    with one "chunk_idx offset n_lines numerator denominator" row per
+    finished chunk. A torn last row (killed mid-write) is ignored.
+    '''
+    done, offset, n_lines, numerator, denominator = 0, 0, 0, 0, 0
+    if progress_path.exists():
+        for row in progress_path.read_text(encoding="utf-8").splitlines():
+            cols = row.split("\t")
+            if len(cols) != 5:
+                continue
+            idx, off, n, num, den = map(int, cols)
+            done, offset = idx + 1, off
+            n_lines += n
+            numerator += num
+            denominator += den
+    return done, offset, n_lines, numerator, denominator
+
+
+def _chunks(sentences, size):
+    chunk = []
+    for sent in sentences:
+        chunk.append(sent)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
 
 
 def _process_file(conllu_path):
     from spacy.tokens import DocBin
     from grc_macronizer import Macronizer
     from grc_macronizer.class_text import _get_blank_vocab
-    from grc_macronizer.oga_conllu import parse_conllu, build_doc
+    from grc_macronizer.oga_conllu import iter_conllu, build_doc
     from grc_utils import count_dichrona_in_open_syllables
 
     vocab = _get_blank_vocab()
 
-    sentences = parse_conllu(conllu_path)
     stem = Path(conllu_path).stem
-    out_lines = []
-    numerator = 0
-    denominator = 0
-    n_chunks = (len(sentences) + CHUNK_SIZE - 1) // CHUNK_SIZE
+    part_path = _parts_dir / f"{stem}.txt"
+    progress_path = _parts_dir / f"{stem}.progress"
 
-    for chunk_idx in range(n_chunks):
-        chunk_sents = sentences[chunk_idx * CHUNK_SIZE:(chunk_idx + 1) * CHUNK_SIZE]
-        chunk_sents = [s for s in chunk_sents if s]
-        if not chunk_sents:
-            continue
+    # resume: drop output of a chunk that was being written when the run died
+    chunks_done, offset, n_lines, numerator, denominator = _read_progress(progress_path)
+    with open(part_path, "ab") as f:
+        f.truncate(offset)
 
-        doc_bin = DocBin(store_user_data=False)
-        texts = []
-        for sent in chunk_sents:
-            doc = build_doc(vocab, sent)
-            doc_bin.add(doc)
-            texts.append(doc.text)
+    with open(part_path, "a", encoding="utf-8") as part_f, \
+         open(progress_path, "a", encoding="utf-8") as progress_f:
+        for chunk_idx, chunk_sents in enumerate(_chunks(iter_conllu(conllu_path), CHUNK_SIZE)):
+            if chunk_idx < chunks_done:
+                continue
 
-        docbin_path = os.path.join(_worker_tmp_dir, f"{stem}_{chunk_idx}.spacy")
-        doc_bin.to_disk(docbin_path)
+            doc_bin = DocBin(store_user_data=False)
+            texts = []
+            for sent in chunk_sents:
+                doc = build_doc(vocab, sent)
+                doc_bin.add(doc)
+                texts.append(doc.text)
 
-        chunk_text = "\n".join(texts) + "\n"
+            docbin_path = os.path.join(_worker_tmp_dir, f"{stem}_{chunk_idx}.spacy")
+            doc_bin.to_disk(docbin_path)
 
-        try:
-            macronizer = Macronizer(make_prints=False, doc_from_file=False,
-                                     no_hypotactic=False, lowercase=False,
-                                     custom_doc=docbin_path)
-            output = macronizer.macronize(chunk_text)
-        except Exception as e:
-            sys.stderr.write(f"[{stem} chunk {chunk_idx}] ERROR: {e}\n")
-            os.remove(docbin_path)
-            continue
+            chunk_text = "\n".join(texts) + "\n"
 
-        os.remove(docbin_path)
+            chunk_lines, chunk_num, chunk_den = [], 0, 0
+            try:
+                macronizer = Macronizer(make_prints=False, doc_from_file=False,
+                                         no_hypotactic=False, lowercase=False,
+                                         custom_doc=docbin_path)
+                output = macronizer.macronize(chunk_text)
+            except Exception as e:
+                sys.stderr.write(f"[{stem} chunk {chunk_idx}] ERROR: {e}\n")
+                output = ""  # recorded as done with no lines, so a resume does not retry it
+            finally:
+                os.remove(docbin_path)
 
-        if output:
-            before = count_dichrona_in_open_syllables(chunk_text)
-            after = count_dichrona_in_open_syllables(output)
-            numerator += max(0, before - after)
-            denominator += before
-            out_lines.extend(l for l in output.splitlines() if l.strip())
+            if output:
+                before = count_dichrona_in_open_syllables(chunk_text)
+                after = count_dichrona_in_open_syllables(output)
+                chunk_num = max(0, before - after)
+                chunk_den = before
+                chunk_lines = [l for l in output.splitlines() if l.strip()]
 
-    return stem, out_lines, numerator, denominator
+            for line in chunk_lines:
+                part_f.write(line + "\n")
+            _sync(part_f)
+            progress_f.write(f"{chunk_idx}\t{part_f.tell()}\t{len(chunk_lines)}\t{chunk_num}\t{chunk_den}\n")
+            _sync(progress_f)
+
+            n_lines += len(chunk_lines)
+            numerator += chunk_num
+            denominator += chunk_den
+
+    with open(_parts_dir / f"{stem}.done", "w", encoding="utf-8") as f:
+        f.write(f"{n_lines}\t{numerator}\t{denominator}\n")
+        _sync(f)
+
+    return stem, n_lines, numerator, denominator
 
 
 def main():
@@ -110,31 +175,38 @@ def main():
         sys.exit(1)
 
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    parts_dir = out_dir / "parts"
+    parts_dir.mkdir(parents=True, exist_ok=True)
     combined_path = out_dir / "oga_macronized.txt"
     stats_path = out_dir / "oga_macronized_stats.tsv"
 
-    print(f"{len(files)} files, {args.workers} workers, chunk size {CHUNK_SIZE}")
+    todo = [p for p in files if not (parts_dir / f"{Path(p).stem}.done").exists()]
+    todo.sort(key=os.path.getsize, reverse=True)  # largest first, so no big file is left for the tail
+
+    print(f"{len(files)} files ({len(files) - len(todo)} already done), "
+          f"{args.workers} workers, chunk size {CHUNK_SIZE}", flush=True)
     t0 = time.time()
-    total_num, total_den = 0, 0
     n_done = 0
 
-    with open(combined_path, "w", encoding="utf-8") as combined_f, \
-         Pool(processes=args.workers, initializer=_init_worker) as pool:
-        for stem, out_lines, numerator, denominator in pool.imap_unordered(_process_file, files):
-            for line in out_lines:
-                combined_f.write(line + "\n")
-            combined_f.flush()
-            total_num += numerator
-            total_den += denominator
+    with Pool(processes=args.workers, initializer=_init_worker, initargs=(str(parts_dir),)) as pool:
+        for stem, n_lines, numerator, denominator in pool.imap_unordered(_process_file, todo):
             n_done += 1
             elapsed = time.time() - t0
             rate = n_done / elapsed if elapsed > 0 else 0
-            eta = (len(files) - n_done) / rate if rate > 0 else float("inf")
-            ratio = total_num / total_den if total_den else 0
-            print(f"[{n_done}/{len(files)}] {stem}: {len(out_lines)} lines "
-                  f"(running ratio {ratio:.2%}, {elapsed:.0f}s elapsed, ETA {eta/60:.1f}min)",
-                  flush=True)
+            eta = (len(todo) - n_done) / rate if rate > 0 else float("inf")
+            ratio = numerator / denominator if denominator else 0
+            print(f"[{n_done}/{len(todo)}] {stem}: {n_lines} lines, ratio {ratio:.2%} "
+                  f"({elapsed:.0f}s elapsed, ETA {eta/60:.1f}min)", flush=True)
+
+    total_num, total_den = 0, 0
+    with open(combined_path, "w", encoding="utf-8") as combined_f:
+        for p in files:
+            stem = Path(p).stem
+            n_lines, numerator, denominator = map(int, (parts_dir / f"{stem}.done").read_text().split("\t"))
+            total_num += numerator
+            total_den += denominator
+            with open(parts_dir / f"{stem}.txt", encoding="utf-8") as part_f:
+                shutil.copyfileobj(part_f, combined_f)
 
     with open(stats_path, "w", encoding="utf-8") as f:
         f.write(f"numerator\t{total_num}\n")
