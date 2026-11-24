@@ -31,17 +31,34 @@ from .verbal_forms import macronize_verbal_forms
 
 # Logging setup
 
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_dir = Path("diagnostics") / "logs"  # relative to working directory!
-log_filename = log_dir / f"macronizer_{timestamp}.log"
+LOG_FORMAT = "%(asctime)s - %(process)d - %(message)s"  # the pid keeps lines of parallel workers apart
 
-os.makedirs(log_dir, exist_ok=True)
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename=log_filename,
-    format="%(asctime)s - %(message)s"
-)
+def configure_logging(log_dir=Path("diagnostics") / "logs"):
+    '''
+    Point the root logger at a fresh log file named after the current process, and return its path.
+
+    Called once at import. Worker processes forked from a parent that already imported the package
+    (e.g. a multiprocessing.Pool after a preload) inherit the parent's file handler, so their lines
+    would all go to one file; such workers should call configure_logging() again (e.g. in the pool
+    initializer) to get a file of their own. Every line also carries the pid.
+    '''
+    log_dir = Path(log_dir)  # relative to working directory!
+    os.makedirs(log_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = log_dir / f"macronizer_{stamp}_{os.getpid()}.log"
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+        handler.close()
+    handler = logging.FileHandler(path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    root.addHandler(handler)
+    root.setLevel(logging.DEBUG)
+    return path
+
+
+log_filename = configure_logging()
 
 logging.info("Starting new log...")
 for line in ascii_macronizer:
@@ -131,7 +148,7 @@ class Macronizer:
 
         return macronized
 
-    def macronize(self, text, genre='prose'):
+    def macronize(self, text, genre='prose', diagnostics_tag=None):
         """
         Macronization is a modular and recursive process comprised of the following 13 steps, 
         with the high-trust db modules first, then the algorithmic modules, the recursive ones and finally the hypotactic db module:
@@ -157,6 +174,16 @@ class Macronizer:
         Accent rules relies on the output of the other modules for optimal performance.
         Hypotactic has special safety measures in place; refer to it's docstring below. 
         My design goal is that it should be easy for the "power user" to change the order of the other modules, and to graft in new ones.
+
+        Diagnostics written to diagnostics/ (relative to the working directory) for every call:
+            modules/<tag>_<module>_results.txt   every form a module helped macronize, at any recursion depth
+            still_ambiguous/still_ambiguous_<tag>.tsv   tokens left with unmarked dichrona
+            traces/<tag>.tsv   one row per token sent to the modules: sentence index (the token's doc in
+                               the call), token, lemma, POS, morph, unmarked open-syllable dichrona before
+                               and after, the result, and the top-level credits (see credit() below)
+        <tag> is diagnostics_tag if given (e.g. "<work>.<chunk>"), else "<timestamp>_<pid>".
+        After the call, self.module_counts, self.module_credit_tokens and self.module_credit_dichrona
+        hold this call's totals.
         """
 
         text_object = Text(text, genre, doc_from_file=self.doc_from_file, debug=self.debug, custom_doc=self.custom_doc) # lowercase only the output (see the return), since lowercased input hides proper names from odyCy and the dbs
@@ -180,7 +207,22 @@ class Macronizer:
         decapitalization_results = []
         
         hypotactic_results = []
-            
+
+        credits = [] # (module, dichrona resolved) for the top-level token being macronized
+
+        def credit(name, old_token, new_token, recursion_depth):
+            '''
+            Top-level credit: how many unmarked open-syllable dichrona a module resolved for the token
+            being macronized. Only the top-level call is credited, so the work done inside a recursive
+            pass is credited to the recursion module that started it, and the credits of a token add up
+            to what the cascade resolved for it. (The *_results lists, by contrast, record successes at
+            every recursion depth, so their counts overlap.)
+            '''
+            if recursion_depth == 1:
+                resolved = count_dichrona_in_open_syllables(old_token) - count_dichrona_in_open_syllables(new_token)
+                if resolved:
+                    credits.append((name, resolved))
+
         def macronization_modules(token, lemma, pos, morph, recursion_depth=0, oxytonized_pass=False, capitalized_pass=False, decapitalized_pass=False, different_ending_pass=False, is_lemma=False, double_accent_pass=False, reversed_elision_pass=False):
             '''
             NOTE it is possible to change the order of modules without having to rewrite too many lines. 
@@ -214,17 +256,21 @@ class Macronizer:
             if token == 'ἄλλα':
                 if 'Fem' in morph.get("Gender"):
                     logging.debug(f'\t✅ Macronized feminine {token}')
+                    credit('custom', token, 'ἄλλα_', recursion_depth)
                     return 'ἄλλα_'
                 else:
                     logging.debug(f'\t✅ Macronized neutre {token}')
+                    credit('custom', token, 'ἄλλα^', recursion_depth)
                     return 'ἄλλα^' # neutre plural
             
             custom_token = custom_macronizer(macronized_token)
-            if self.debug and custom_token != macronized_token:
-                logging.debug(f'\t✅ Custom: {macronized_token} => {merge_or_overwrite_markup(custom_token, macronized_token)}, with {count_dichrona_in_open_syllables(merge_or_overwrite_markup(custom_token, macronized_token))} left')
-            elif self.debug:
+            merged_custom_token = merge_or_overwrite_markup(custom_token, macronized_token)
+            if custom_token != macronized_token:
+                logging.debug(f'\t✅ Custom helped: {macronized_token} => {merged_custom_token}, with {count_dichrona_in_open_syllables(merged_custom_token)} left')
+                credit('custom', macronized_token, merged_custom_token, recursion_depth)
+            else:
                 logging.debug(f'\t❌ Custom did not help')
-            macronized_token = merge_or_overwrite_markup(custom_token, macronized_token)
+            macronized_token = merged_custom_token
 
             if count_dichrona_in_open_syllables(macronized_token) == 0:
                 custom_results.append(macronized_token)
@@ -239,7 +285,8 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(wiktionary_token, macronized_token)
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 wiktionary_results.append(macronized_token)
-                logging.debug(f'\t✅ Wiktionary: {token} => {wiktionary_token}, with {count_dichrona_in_open_syllables(wiktionary_token)} left')
+                credit('wiktionary', old_macronized_token, macronized_token, recursion_depth)
+                logging.debug(f'\t✅ Wiktionary helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Wiktionary did not help')
             
@@ -254,6 +301,7 @@ class Macronizer:
                 macronized_token = merge_or_overwrite_markup(lsj_token, macronized_token)
                 if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     lsj_results.append(macronized_token)
+                    credit('lsj', old_macronized_token, macronized_token, recursion_depth)
                     logging.debug(f'\t✅ LSJ helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
                     logging.debug(f'\t❌ LSJ did not help')
@@ -268,6 +316,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(nominal_forms_token, macronized_token)
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 nominal_forms_results.append(macronized_token)
+                credit('nominal_forms', old_macronized_token, macronized_token, recursion_depth)
                 logging.debug(f'\t✅ Nominal forms helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Nominal forms did not help')
@@ -278,6 +327,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(verbal_forms_token, macronized_token)
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 verbal_forms_results.append(macronized_token)
+                credit('verbal_forms', old_macronized_token, macronized_token, recursion_depth)
                 logging.debug(f'\t✅ Verbal forms helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Verbal forms did not help')
@@ -290,6 +340,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(accent_rules_token, macronized_token)
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 accent_rules_results.append(macronized_token)
+                credit('accent_rules', old_macronized_token, macronized_token, recursion_depth)
                 logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Accent rules did not help')
@@ -364,6 +415,7 @@ class Macronizer:
                 macronized_token = merge_or_overwrite_markup(prefix_token, macronized_token)
                 if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     prefix_results.append(macronized_token)
+                    credit('prefix', old_macronized_token, macronized_token, recursion_depth)
                     logging.debug(f'\t✅ Prefix macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
                     logging.debug(f'\t❌ Prefix macronization did not help')
@@ -431,6 +483,7 @@ class Macronizer:
                         macronized_token = merge_or_overwrite_markup(reconstituted_token, macronized_token)
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         double_accent_recursion_results.append(macronized_token)
+                        credit('double_accent_recursion', old_macronized_token, macronized_token, recursion_depth)
                         logging.debug(f'\t✅ Double accent macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     else:
                         logging.debug(f'\t❌ Double accent macronization did not help')
@@ -463,6 +516,7 @@ class Macronizer:
                     macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         reversed_elision_recursion_results.append(macronized_token)
+                        credit('reversed_elision_recursion', old_macronized_token, macronized_token, recursion_depth)
                         logging.debug(f'\t✅ Reversed elision with {elided_vowel} helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                         break
                     logging.debug(f'\t❌ Reversed elision with {elided_vowel} did not help')
@@ -540,6 +594,7 @@ class Macronizer:
 
                 if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     case_ending_recursion_results.append(macronized_token)
+                    credit('case_ending_recursion', old_macronized_token, macronized_token, recursion_depth)
                     logging.debug(f'\t✅ Wrong-case-ending (D2) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
                     logging.debug(f'\t❌ Wrong-case-ending (D2) did not help')
@@ -589,6 +644,7 @@ class Macronizer:
 
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         case_ending_recursion_results.append(macronized_token)
+                        credit('case_ending_recursion', old_macronized_token, macronized_token, recursion_depth)
                         logging.debug(f'\t✅ Wrong-case-ending (D1) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     else:
                         logging.debug(f'\t❌ Wrong-case-ending (D1) did not help')
@@ -611,6 +667,7 @@ class Macronizer:
                 macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
                 if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     oxytonization_results.append(macronized_token)
+                    credit('oxytonization', old_macronized_token, macronized_token, recursion_depth)
                     logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
                     logging.debug(f'\t❌ Oxytonizing did not help')
@@ -626,8 +683,7 @@ class Macronizer:
                 old_macronized_token = macronized_token
                 decapitalized_token = lower_grc(token[0]) + token[1:]
                 if not decapitalized_pass and macronized_token != decapitalized_token: # without the capitalized_pass check, we get infinite recursion for capitalized tokens
-                    if self.debug:
-                        logging.debug(f'\t Decapitalizing {macronized_token} as {decapitalized_token}')
+                    logging.debug(f'\t Decapitalizing {macronized_token} as {decapitalized_token}')
                     
                     decapitalized_token = macronization_modules(decapitalized_token, lemma, pos, morph, recursion_depth, oxytonized_pass=oxytonized_pass, capitalized_pass=capitalized_pass,  decapitalized_pass=True, different_ending_pass=different_ending_pass, is_lemma=is_lemma, double_accent_pass=double_accent_pass, reversed_elision_pass=reversed_elision_pass)
                     recapitalized_token = token[0] + decapitalized_token[1:] # restore the original first character
@@ -636,9 +692,9 @@ class Macronizer:
 
                     if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         decapitalization_results.append(macronized_token)
-                        if self.debug:
-                            logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
-                    elif self.debug:
+                        credit('decapitalization', old_macronized_token, macronized_token, recursion_depth)
+                        logging.debug(f'\t✅ Decapitalization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
+                    else:
                         logging.debug(f'\t❌ Decapitalization did not help')
 
             ###############################
@@ -658,6 +714,7 @@ class Macronizer:
             macronized_token = merge_or_overwrite_markup(hypotactic_token, macronized_token, precedence='old')
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 hypotactic_results.append(macronized_token)
+                credit('hypotactic', old_macronized_token, macronized_token, recursion_depth)
                 logging.debug(f'\t✅ Hypotactic helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
                 logging.debug(f'\t❌ Hypotactic did not help')
@@ -668,9 +725,10 @@ class Macronizer:
 
             if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                 accent_rules_results.append(macronized_token)
-                logging.debug(f'\t✅ Accent rules helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
+                credit('accent_rules_final', old_macronized_token, macronized_token, recursion_depth)
+                logging.debug(f'\t✅ Accent rules (final) helped: {old_macronized_token} => {macronized_token}, with {count_dichrona_in_open_syllables(macronized_token)} left')
             else:
-                logging.debug(f'\t❌ Accent rules did not help')
+                logging.debug(f'\t❌ Accent rules (final) did not help')
     
             ################
             # SANITY CHECK #
@@ -679,7 +737,7 @@ class Macronizer:
             macronized_normalized_for_checking = normalize_word(macronized_token.replace("^", "").replace("_", ""))
             token_normalized_for_checking = normalize_word(token.replace("^", "").replace("_", ""))
             if macronized_normalized_for_checking != token_normalized_for_checking: 
-                logging.DEBUG(f"Watch out! We just accidentally perverted a token: {token_normalized_for_checking} has become {macronized_normalized_for_checking}")
+                logging.warning(f"Watch out! We just accidentally perverted a token: {token_normalized_for_checking} has become {macronized_normalized_for_checking}")
 
             macronized_token = demacronize_diphthong(macronized_token)
 
@@ -687,13 +745,25 @@ class Macronizer:
 
         macronized_tokens = []
         still_ambiguous = []
-        for token, lemma, pos, morph in tqdm(token_lemma_pos_morph, desc="Macronizing tokens ☕️", leave=self.make_prints):
+        trace_rows = []
+        module_credit_tokens = Counter()
+        module_credit_dichrona = Counter()
+        sentence_indices = getattr(text_object, 'token_sentence_indices', [None] * len(token_lemma_pos_morph))
+        for (token, lemma, pos, morph), sentence_idx in tqdm(zip(token_lemma_pos_morph, sentence_indices), total=len(token_lemma_pos_morph), desc="Macronizing tokens ☕️", leave=self.make_prints):
             logging.debug(f'Sending to macronization_modules: {token} ({lemma}, {pos}, {morph})')
+            credits.clear()
             result = macronization_modules(token, lemma, pos, morph)
             result = re.sub(r"'[\^_]", "'", result) # a mark after an elision apostrophe belongs to the elided vowel
-            if count_dichrona_in_open_syllables(result) > 0:
+            left = count_dichrona_in_open_syllables(result)
+            if left > 0:
                 still_ambiguous.append((result, lemma, pos, morph))
             macronized_tokens.append(result)
+            credit_str = ",".join(f"{name}={n}" for name, n in credits)
+            for name, n in credits:
+                module_credit_tokens[name] += 1
+                module_credit_dichrona[name] += n
+            trace_rows.append(f"{sentence_idx}\t{token}\t{lemma}\t{pos}\t{morph}\t{count_dichrona_in_open_syllables(token)}\t{left}\t{result}\t{credit_str}")
+            logging.debug(f'Result: {token} => {result}, {left} left, credits [{credit_str}]')
 
         logging.info(f'\n\n### END OF MACRONIZATION ###\n\n')
 
@@ -725,18 +795,30 @@ class Macronizer:
         }
 
         self.module_counts = {name.removesuffix("_results"): len(result_list) for name, result_list in results_dict.items()} # for callers that aggregate across calls
+        self.module_credit_tokens = dict(module_credit_tokens) # top-level credits: tokens a module resolved at least one dichronon of
+        self.module_credit_dichrona = dict(module_credit_dichrona) # top-level credits: dichrona a module resolved
 
         module_dir = Path("diagnostics") / "modules"
         module_dir.mkdir(parents=True, exist_ok=True)  # better than os.makedirs
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f") # one stamp per call, unique across parallel processes with the pid
+        tag = diagnostics_tag if diagnostics_tag else f"{timestamp}_{os.getpid()}"
         for name, result_list in results_dict.items():
             logging.debug(f'RESULT LIST: Found {len(result_list)} results in {name}')
 
-            out_path = module_dir / f"{timestamp}_{os.getpid()}_{name}.txt"
+            out_path = module_dir / f"{tag}_{name}.txt"
             with out_path.open("w", encoding="utf-8") as f:
                 for word in result_list:
                     f.write(f"{word}\n")
+
+        # TRACES
+
+        trace_dir = Path("diagnostics") / "traces"
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        with (trace_dir / f"{tag}.tsv").open("w", encoding="utf-8") as f:
+            f.write("sentence\ttoken\tlemma\tpos\tmorph\tbefore\tafter\tresult\tcredits\n")
+            for row in trace_rows:
+                f.write(row + "\n")
 
         # STILL_AMBIGUOUS
 
@@ -762,7 +844,13 @@ class Macronizer:
         still_ambiguous_dir = Path("diagnostics") / "still_ambiguous"
         still_ambiguous_dir.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
 
-        if len(macronized_tokens) > 0:
+        if len(macronized_tokens) > 0 and diagnostics_tag:
+            file_name = still_ambiguous_dir / f'still_ambiguous_{diagnostics_tag}.tsv'
+            with file_name.open('w', encoding='utf-8') as f:
+                for item in unique_sorted_list:
+                    count = counts[item[0]]
+                    f.write(f"{count}\t{item[0]}\t{item[1]}\t{item[2]}\t{item[3]}\n")
+        elif len(macronized_tokens) > 0:
             if macronized_tokens[0]:
                 file_stub = still_ambiguous_dir / f'still_ambiguous_{macronized_tokens[0].replace("^", "").replace("_", "")}'
             else:
