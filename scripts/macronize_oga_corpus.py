@@ -91,7 +91,7 @@ def _read_progress(progress_path):
             n_lines += n
             numerator += num
             denominator += den
-            if len(cols) == 6 and cols[5]:
+            if len(cols) >= 6 and cols[5]:
                 for kv in cols[5].split(","):
                     name, count = kv.split("=")
                     modules[name] += int(count)
