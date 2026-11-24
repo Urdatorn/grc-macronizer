@@ -362,7 +362,7 @@ class Macronizer:
                 logging.debug(f'\t Prefix token for {token}: {prefix_token}')
 
                 macronized_token = merge_or_overwrite_markup(prefix_token, macronized_token)
-                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     prefix_results.append(macronized_token)
                     logging.debug(f'\t✅ Prefix macronization helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
@@ -538,7 +538,7 @@ class Macronizer:
 
                 macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
 
-                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     case_ending_recursion_results.append(macronized_token)
                     logging.debug(f'\t✅ Wrong-case-ending (D2) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
@@ -587,7 +587,7 @@ class Macronizer:
                 if restored_token:
                     macronized_token = merge_or_overwrite_markup(restored_token, macronized_token)
 
-                    if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                    if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                         case_ending_recursion_results.append(macronized_token)
                         logging.debug(f'\t✅ Wrong-case-ending (D1) helped: {count_dichrona_in_open_syllables(macronized_token)} left')
                     else:
@@ -609,7 +609,7 @@ class Macronizer:
                 else:
                     rebarytonized_token = oxytonized_token[:-2] + replace_acute_with_grave(oxytonized_token[-2:])
                 macronized_token = merge_or_overwrite_markup(rebarytonized_token, macronized_token)
-                if self.debug and count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
+                if count_dichrona_in_open_syllables(macronized_token) < count_dichrona_in_open_syllables(old_macronized_token):
                     oxytonization_results.append(macronized_token)
                     logging.debug(f'\t✅ Oxytonizing helped: : {count_dichrona_in_open_syllables(macronized_token)} left')
                 else:
