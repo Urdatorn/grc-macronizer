@@ -263,47 +263,67 @@ class Text:
         result_text = self.text # making a working copy
         macronized_words = [word for word in self.macronized_words if word is not None and any(macron in word for macron in ['_', '^'])]
         
-        word_counts = {}
-        
         replacements = [] # going to be a list of triples: (starting position, ending position, macronized word)
-        
+        claimed = bytearray(len(self.text)) # 1 for every character already covered by a replacement
+        claims_per_word = {}
+
         for macronized_word in tqdm(macronized_words, desc="Finding replacements", leave=False):
             normalized_word = normalize_word(macronized_word.replace('_', '').replace('^', ''))
             
             if not normalized_word:
                 continue
             
-            current_count = word_counts.get(normalized_word, 0)  # how many times have we seen the present word before? default to 0
-            
             if self.debug:
-                logging.debug(f"Processing: {macronized_word} (Current count: {current_count})")
+                logging.debug(f"Processing: {macronized_word} (Occurrences already placed: {claims_per_word.get(normalized_word, 0)})")
             
-            '''
+            r'''
             NOTE re the regex: \b does not work for strings containing apostrophe!
             Hence we use negative lookbehind (?<!) and lookahead groups (?!) with explicit w to match word boundaries instead.
+
+            The boundary is deliberately loose: a word also matches with a non-letter that is not \w
+            attached, e.g. ἔστιν inside “ἔστιν, where the tokenizer splits off the quotation mark.
+            But then a bare word can also match inside another macronized token, e.g. πάντα inside
+            ῾πάντα (῾ U+1FFE used as a quotation mark is not \w). Each word therefore takes its
+            first match that does not overlap a span already claimed by an earlier word, instead of
+            its n-th match: two replacements on overlapping spans used to splice the text at stale
+            indices and duplicate the word's last letter (῾πάντα -> ῾πάνταα). Without overlaps this
+            picks exactly the n-th match, as before, since a word's own earlier occurrences are the
+            claimed ones.
             '''
             matches = list(re.finditer(fr"(?<![\w']){re.escape(normalized_word)}(?![\w'])", self.text)) # the apostrophe counts as part of a word, or καθ would also match the start of καθ' and both replacements would land on the same span
             matches = [m for m in matches if (m.group() != "ἂν" or m.group() != "ἄν" or m.group() != "ἀν")] # remove ἂν and ἄν from the list of matches, since they are already macronized
 
-            if current_count >= len(matches):
-                logging.debug(f"Current count: {current_count}, Matches: {matches}")
-                print(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
+            target_match = next((m for m in matches if not any(claimed[m.start():m.end()])), None)
+            if target_match is None:
+                logging.debug(f"Matches: {matches}")
+                print(f"Could not find occurrence {claims_per_word.get(normalized_word, 0) + 1} of word '{normalized_word}'")
                 continue
-                #raise ValueError(f"Could not find occurrence {current_count + 1} of word '{normalized_word}'")
+                #raise ValueError(f"Could not find occurrence {claims_per_word.get(normalized_word, 0) + 1} of word '{normalized_word}'")
             
-            target_match = matches[current_count]
             # .start() and .end() are methods of a regex Match object, giving the start and end indices of the match
             # NOTE TO SELF TO REMEMBER: .start() is inclusive, while .end() is *exclusive*, meaning .end() returns the index of the first character *just after* the match
             start_pos = target_match.start()
             end_pos = target_match.end()
             
             replacements.append((start_pos, end_pos, macronized_word))
-            
-            word_counts[normalized_word] = current_count + 1
+            claimed[start_pos:end_pos] = b'\x01' * (end_pos - start_pos)
+            claims_per_word[normalized_word] = claims_per_word.get(normalized_word, 0) + 1
         
+        # Replacements must not overlap: applied back to front, an overlapping pair would splice the
+        # text at stale indices and duplicate or drop characters. The claimed-span check above
+        # prevents this; as a safeguard, keep only the first replacement of any overlapping group.
+        replacements.sort(key=lambda x: x[0])
+        non_overlapping = []
+        for start_pos, end_pos, macronized_word in replacements:
+            if non_overlapping and start_pos < non_overlapping[-1][1]:
+                logging.warning(f"Skipping replacement '{macronized_word}' at {start_pos}-{end_pos}: overlaps '{non_overlapping[-1][2]}' at {non_overlapping[-1][0]}-{non_overlapping[-1][1]}")
+                continue
+            non_overlapping.append((start_pos, end_pos, macronized_word))
+        replacements = non_overlapping
+
         # NOTE USEFUL NLP TRICK: Reversing the replacements list. This is because when a ^ or _ is added to a word, the positions of all subsequent words change, but those of all previous words remain the same.
-        replacements.sort(reverse=True, key=lambda x: x[0]) # the lambda means sorting by start_pos *only*: ties are left in their original order. I don't think this is necessary, because there shouldn't be two words with the identical start_pos.
-        
+        replacements.sort(reverse=True, key=lambda x: x[0]) # the lambda means sorting by start_pos *only*: ties are left in their original order.
+
         for start_pos, end_pos, replacement in tqdm(replacements, desc="Applying replacements", leave=False):
             result_text = result_text[:start_pos] + replacement + result_text[end_pos:] # remember, slicing (:) means "from and including" the start index and "up to but not including" the end index, so this line only works because .end() is exclusive, as noted above!
         
@@ -327,7 +347,10 @@ class Text:
             if len(original_no_macrons) != len(result_no_macrons):
                 print(f"Length difference: original={len(original_no_macrons)}, result={len(result_no_macrons)}")
             
-            print("Integration corrupted the text: changes other than macrons were made.")
-            logging.debug("Integration corrupted the text: changes other than macrons were made.")
-        
+            logging.error("Integration corrupted the text: changes other than macrons were made.")
+            # Fail loudly rather than return corrupted text (it used to be returned with only a
+            # printed warning). An explicit raise, not an assert statement, so that it also
+            # holds under python -O.
+            raise AssertionError("Integration corrupted the text: changes other than macrons were made.")
+
         return self.macronized_text
